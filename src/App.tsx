@@ -9,63 +9,71 @@ import { TransactionForm } from './components/TransactionForm/TransactionForm';
 import type { Tab } from './types';
 import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload, Cloud, CloudOff, Loader } from 'lucide-react';
 import { format } from 'date-fns';
-
-const NAV_ITEMS: { tab: Tab; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
-  { tab: 'dashboard', icon: Home, label: '대시보드' },
-  { tab: 'daily', icon: CalendarDays, label: '날짜별' },
-  { tab: 'cards', icon: CreditCard, label: '카드' },
-  { tab: 'analytics', icon: BarChart3, label: '분석' },
-  { tab: 'add', icon: Plus, label: '추가' },
-];
+import { TRANSLATIONS } from './lib/i18n';
+import type { Lang } from './lib/i18n';
 
 function DueBanner() {
   const cards = useStore(s => s.cards);
+  const lang = useStore(s => s.language);
+  const T = TRANSLATIONS[lang];
   const today = new Date().getDate();
-  const soonCards = cards.filter(
-    c => c.isActive && c.payDueDay && c.payDueDay >= today && c.payDueDay - today <= 3
-  );
+  const soonCards = cards.filter(c => c.isActive && c.payDueDay && c.payDueDay >= today && c.payDueDay - today <= 3);
   if (soonCards.length === 0) return null;
   return (
     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-3 py-2 mb-3">
       <p className="text-xs text-yellow-300 font-medium">
-        ⚠️ 결제일 임박: {soonCards.map(c => `${c.name} (${c.payDueDay}일)`).join(', ')}
+        {T.due_banner(soonCards.map(c => `${c.name} (${c.payDueDay}일)`).join(', '))}
       </p>
     </div>
   );
 }
 
-const TITLE: Record<Tab, string> = {
-  dashboard: '대시보드',
-  daily: '날짜별 지출',
-  cards: '카드 관리',
-  analytics: '분석',
-  add: '거래 추가',
-};
-
 function SyncBadge({ status }: { status: SyncStatus }) {
-  if (status === 'syncing') return (
-    <span className="flex items-center gap-1 text-xs text-yellow-300">
-      <Loader size={12} className="animate-spin" /> 동기화 중…
-    </span>
-  );
-  if (status === 'synced') return (
-    <span className="flex items-center gap-1 text-xs text-green-400">
-      <Cloud size={12} /> 동기화됨
-    </span>
-  );
-  if (status === 'error') return (
-    <span className="flex items-center gap-1 text-xs text-red-400">
-      <CloudOff size={12} /> 오프라인
-    </span>
-  );
+  const lang = useStore(s => s.language);
+  const T = TRANSLATIONS[lang];
+  if (status === 'syncing') return <span className="flex items-center gap-1 text-xs text-yellow-300"><Loader size={12} className="animate-spin" /> {T.sync_syncing}</span>;
+  if (status === 'synced') return <span className="flex items-center gap-1 text-xs text-green-400"><Cloud size={12} /> {T.sync_synced}</span>;
+  if (status === 'error') return <span className="flex items-center gap-1 text-xs text-red-400"><CloudOff size={12} /> {T.sync_offline}</span>;
   return null;
+}
+
+function LangToggle() {
+  const { language, setLanguage } = useStore();
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-white/10">
+      {(['ko', 'en'] as Lang[]).map(l => (
+        <button key={l} onClick={() => setLanguage(l)}
+          className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+            language === l ? 'bg-[var(--color-highlight)] text-white' : 'text-[var(--color-muted)] hover:bg-white/10'
+          }`}
+        >
+          {l === 'ko' ? '한국어' : 'EN'}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export default function App() {
   const { activeTab, setActiveTab, exportData, importData, initSync, syncStatus } = useStore();
+  const lang = useStore(s => s.language);
+  const T = TRANSLATIONS[lang];
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { initSync(); }, []);
+
+  const NAV_ITEMS: { tab: Tab; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
+    { tab: 'dashboard', icon: Home, label: T.nav_dashboard },
+    { tab: 'daily', icon: CalendarDays, label: T.nav_daily },
+    { tab: 'cards', icon: CreditCard, label: T.nav_cards },
+    { tab: 'analytics', icon: BarChart3, label: T.nav_analytics },
+    { tab: 'add', icon: Plus, label: T.nav_add },
+  ];
+
+  const TITLE: Record<Tab, string> = {
+    dashboard: T.nav_dashboard, daily: T.nav_daily,
+    cards: T.nav_cards, analytics: T.nav_analytics, add: T.nav_add,
+  };
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -88,8 +96,11 @@ export default function App() {
       >
         <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>💰 Budget</h1>
-          <p className="text-xs mt-0.5 mb-1" style={{ color: 'var(--color-muted)' }}>Kyle & Ella</p>
-          <SyncBadge status={syncStatus} />
+          <p className="text-xs mt-0.5 mb-2" style={{ color: 'var(--color-muted)' }}>Kyle & Ella</p>
+          <div className="flex items-center justify-between">
+            <SyncBadge status={syncStatus} />
+            <LangToggle />
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -117,14 +128,14 @@ export default function App() {
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-1"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Download size={14} /> 데이터 내보내기
+            <Download size={14} /> {T.export_data}
           </button>
           <button
             onClick={() => fileRef.current?.click()}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-2"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Upload size={14} /> 데이터 가져오기
+            <Upload size={14} /> {T.import_data}
           </button>
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
           <p className="text-center" style={{ fontSize: 10, color: 'var(--color-muted)' }}>
@@ -148,12 +159,11 @@ export default function App() {
           <SyncBadge status={syncStatus} />
         </header>
 
-        {/* Mobile sync status bar */}
-        {syncStatus === 'syncing' && (
-          <div className="md:hidden flex items-center justify-center gap-1 py-1 text-xs text-yellow-300 bg-yellow-500/10">
-            <Loader size={10} className="animate-spin" /> 클라우드 동기화 중…
-          </div>
-        )}
+        {/* Mobile top bar: sync + language toggle */}
+        <div className="md:hidden flex items-center justify-between px-4 py-1.5 border-b border-white/5">
+          <SyncBadge status={syncStatus} />
+          <LangToggle />
+        </div>
 
         {/* Content */}
         <div

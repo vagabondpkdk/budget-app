@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 import type { Transaction, Card, MonthlyAsset, Tab } from '../types';
+import type { Lang } from '../lib/i18n';
 import { initialCards, initialTransactions, initialAssets } from '../data/seedData';
 import { generateId } from '../utils';
 import { supabase } from '../lib/supabase';
+
+const LS_LANGUAGE = 'budget-app-language';
 
 const LS_TRANSACTIONS = 'budget-app-transactions';
 const LS_CARDS = 'budget-app-cards';
@@ -104,8 +107,10 @@ interface StoreState {
   currentYear: number;
   currentMonth: number;
   syncStatus: SyncStatus;
+  language: Lang;
 
   setActiveTab: (tab: Tab) => void;
+  setLanguage: (lang: Lang) => void;
   setSelectedDate: (date: string | null) => void;
   setCurrentMonth: (year: number, month: number) => void;
 
@@ -117,6 +122,7 @@ interface StoreState {
   updateCard: (id: string, card: Partial<Card>) => void;
   deleteCard: (id: string) => void;
   toggleCardActive: (id: string) => void;
+  reorderCards: (cards: Card[]) => void;
 
   updateAsset: (year: number, month: number, data: Partial<MonthlyAsset>) => void;
 
@@ -143,10 +149,12 @@ export const useStore = create<StoreState>((set, get) => {
     currentYear: initYear,
     currentMonth: initMonth,
     syncStatus: 'idle',
+    language: (loadFromStorage(LS_LANGUAGE, 'ko') as Lang),
 
     setActiveTab: (tab) => set({ activeTab: tab }),
     setSelectedDate: (date) => set({ selectedDate: date }),
     setCurrentMonth: (year, month) => set({ currentYear: year, currentMonth: month }),
+    setLanguage: (lang) => { saveToStorage(LS_LANGUAGE, lang); set({ language: lang }); },
 
     // ── Transactions ──
     addTransaction: (t) => {
@@ -202,6 +210,11 @@ export const useStore = create<StoreState>((set, get) => {
       set({ cards });
       const updated = cards.find(c => c.id === id);
       if (updated) supabase.from('cards').upsert(cardToDb(updated));
+    },
+
+    reorderCards: (cards) => {
+      saveToStorage(LS_CARDS, cards);
+      set({ cards });
     },
 
     // ── Assets ──
