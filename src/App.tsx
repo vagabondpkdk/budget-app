@@ -125,7 +125,10 @@ export default function App() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-4 md:px-6 overflow-y-auto" style={{ paddingBottom: '80px' }}>
+        <div
+          className="flex-1 px-4 py-4 md:px-6 overflow-y-auto safe-top"
+          style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}
+        >
           <DueBanner />
           {activeTab === 'dashboard' && <Dashboard />}
           {activeTab === 'daily' && <DailyView />}
@@ -141,7 +144,7 @@ export default function App() {
 
       {/* ── Mobile Bottom Bar ── */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-20 flex"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-20 flex safe-bottom"
         style={{ backgroundColor: 'var(--color-surface)', borderTop: '1px solid rgba(255,255,255,0.1)' }}
       >
         {NAV_ITEMS.map(({ tab, icon: Icon, label }) => (
