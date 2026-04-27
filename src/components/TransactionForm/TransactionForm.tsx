@@ -78,7 +78,7 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-3 space-y-2.5">
+      <form onSubmit={handleSubmit} className="p-3 space-y-2">
         {/* Type buttons - compact single row */}
         <div className="flex gap-1.5 flex-wrap">
           {typeOptions.map(opt => (
@@ -130,17 +130,18 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
         {/* Category Grid - compact */}
         <div>
           <label className="text-xs text-[var(--color-muted)] mb-1 block">{T.category_lbl}</label>
-          <div className="grid grid-cols-7 gap-1 max-h-24 overflow-y-auto">
+          <div className="grid grid-cols-7 gap-1">
             {CATEGORIES.map(cat => (
               <button key={cat} type="button" onClick={() => setCategory(cat)} title={cat}
-                className={`flex flex-col items-center gap-0.5 p-1 rounded-lg transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0 py-1 px-0.5 rounded-md transition-colors ${
                   category === cat
                     ? 'bg-[var(--color-accent)] text-[var(--color-text)]'
                     : 'bg-white/5 text-[var(--color-muted)] hover:bg-white/10'
                 }`}
+                style={{ minHeight: '42px' }}
               >
-                <span className="text-sm leading-none">{getCategoryIcon(cat)}</span>
-                <span className="leading-tight text-center truncate w-full" style={{ fontSize: '8px' }}>
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>{getCategoryIcon(cat)}</span>
+                <span className="leading-tight text-center w-full overflow-hidden" style={{ fontSize: '7px', marginTop: '2px' }}>
                   {tCat(lang, cat)}
                 </span>
               </button>

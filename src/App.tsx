@@ -159,15 +159,22 @@ export default function App() {
           <SyncBadge status={syncStatus} />
         </header>
 
-        {/* Mobile top bar: sync + language toggle */}
-        <div className="md:hidden flex items-center justify-between px-4 py-1.5 border-b border-white/5">
+        {/* Mobile top bar: safe-area padding here (NOT in content) */}
+        <div
+          className="md:hidden flex items-center justify-between px-4 border-b border-white/10 sticky top-0 z-10"
+          style={{
+            paddingTop: 'calc(env(safe-area-inset-top) + 8px)',
+            paddingBottom: '8px',
+            backgroundColor: 'var(--color-surface)',
+          }}
+        >
           <SyncBadge status={syncStatus} />
           <LangToggle />
         </div>
 
-        {/* Content */}
+        {/* Content — no safe-top here; top bar above handles it */}
         <div
-          className="flex-1 px-4 py-4 md:px-6 overflow-y-auto safe-top"
+          className="flex-1 px-4 py-4 md:px-6 overflow-y-auto"
           style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}
         >
           <DueBanner />
