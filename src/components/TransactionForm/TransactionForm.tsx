@@ -65,7 +65,7 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
   }
 
   return (
-    <div className="bg-[var(--color-surface)] rounded-2xl overflow-hidden">
+    <div className="bg-[var(--color-surface)] rounded-2xl overflow-hidden w-full max-w-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10">
         <h3 className="font-semibold text-[var(--color-text)] text-sm">
@@ -95,24 +95,25 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
         </div>
 
         {/* Date & Amount */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
+        <div className="grid grid-cols-2 gap-2" style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0 }}>
             <label className="text-xs text-[var(--color-muted)] mb-0.5 block">{T.date_lbl}</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full bg-white/10 rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-text)] border border-white/10 focus:outline-none focus:border-[var(--color-info)]" />
+              className="w-full min-w-0 bg-white/10 rounded-lg px-2 py-1.5 text-xs text-[var(--color-text)] border border-white/10 focus:outline-none focus:border-[var(--color-info)]"
+              style={{ fontSize: '12px' }} />
           </div>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <label className="text-xs text-[var(--color-muted)] mb-0.5 block">{T.amount_lbl}</label>
             <input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
               step="0.01" min="0"
-              className="w-full bg-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono text-[var(--color-text)] border border-white/10 focus:outline-none focus:border-[var(--color-info)]" />
+              className="w-full min-w-0 bg-white/10 rounded-lg px-2 py-1.5 text-xs font-mono text-[var(--color-text)] border border-white/10 focus:outline-none focus:border-[var(--color-info)]" />
           </div>
         </div>
 
         {/* Card Selection */}
-        <div>
+        <div className="w-full" style={{ minWidth: 0 }}>
           <label className="text-xs text-[var(--color-muted)] mb-1 block">{T.card_select}</label>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="flex gap-1.5 pb-1" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             {activeCards.map(card => (
               <button key={card.id} type="button" onClick={() => setCardId(card.id)}
                 className={`flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${

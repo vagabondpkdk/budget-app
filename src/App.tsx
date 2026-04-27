@@ -174,7 +174,7 @@ export default function App() {
 
         {/* Content — no safe-top here; top bar above handles it */}
         <div
-          className="flex-1 px-4 py-4 md:px-6 overflow-y-auto"
+          className="flex-1 px-4 py-4 md:px-6 overflow-y-auto overflow-x-hidden"
           style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}
         >
           <DueBanner />
@@ -183,7 +183,7 @@ export default function App() {
           {activeTab === 'cards' && <CardManager />}
           {activeTab === 'analytics' && <Analytics />}
           {activeTab === 'add' && (
-            <div style={{ maxWidth: 512, margin: '0 auto' }}>
+            <div style={{ maxWidth: 512, margin: '0 auto', width: '100%', minWidth: 0 }}>
               <TransactionForm onClose={() => setActiveTab('dashboard')} />
             </div>
           )}
