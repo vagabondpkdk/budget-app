@@ -1,12 +1,13 @@
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useStore } from './store/useStore';
+import type { SyncStatus } from './store/useStore';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { DailyView } from './components/DailyView/DailyView';
 import { CardManager } from './components/CardManager/CardManager';
 import { Analytics } from './components/Analytics/Analytics';
 import { TransactionForm } from './components/TransactionForm/TransactionForm';
 import type { Tab } from './types';
-import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload } from 'lucide-react';
+import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload, Cloud, CloudOff, Loader } from 'lucide-react';
 import { format } from 'date-fns';
 
 const NAV_ITEMS: { tab: Tab; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
@@ -41,9 +42,30 @@ const TITLE: Record<Tab, string> = {
   add: '거래 추가',
 };
 
+function SyncBadge({ status }: { status: SyncStatus }) {
+  if (status === 'syncing') return (
+    <span className="flex items-center gap-1 text-xs text-yellow-300">
+      <Loader size={12} className="animate-spin" /> 동기화 중…
+    </span>
+  );
+  if (status === 'synced') return (
+    <span className="flex items-center gap-1 text-xs text-green-400">
+      <Cloud size={12} /> 동기화됨
+    </span>
+  );
+  if (status === 'error') return (
+    <span className="flex items-center gap-1 text-xs text-red-400">
+      <CloudOff size={12} /> 오프라인
+    </span>
+  );
+  return null;
+}
+
 export default function App() {
-  const { activeTab, setActiveTab, exportData, importData } = useStore();
+  const { activeTab, setActiveTab, exportData, importData, initSync, syncStatus } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { initSync(); }, []);
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -66,7 +88,8 @@ export default function App() {
       >
         <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>💰 Budget</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>Kyle & Ella</p>
+          <p className="text-xs mt-0.5 mb-1" style={{ color: 'var(--color-muted)' }}>Kyle & Ella</p>
+          <SyncBadge status={syncStatus} />
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1">
@@ -114,7 +137,7 @@ export default function App() {
       <main className="flex-1 md:ml-60 flex flex-col" style={{ minHeight: '100vh' }}>
         {/* Desktop header */}
         <header
-          className="hidden md:flex items-center px-6 py-4 sticky top-0 z-10"
+          className="hidden md:flex items-center justify-between px-6 py-4 sticky top-0 z-10"
           style={{
             backgroundColor: 'rgba(22, 33, 62, 0.8)',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -122,7 +145,15 @@ export default function App() {
           }}
         >
           <h2 className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>{TITLE[activeTab]}</h2>
+          <SyncBadge status={syncStatus} />
         </header>
+
+        {/* Mobile sync status bar */}
+        {syncStatus === 'syncing' && (
+          <div className="md:hidden flex items-center justify-center gap-1 py-1 text-xs text-yellow-300 bg-yellow-500/10">
+            <Loader size={10} className="animate-spin" /> 클라우드 동기화 중…
+          </div>
+        )}
 
         {/* Content */}
         <div
