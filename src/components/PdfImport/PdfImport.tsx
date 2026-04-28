@@ -3,7 +3,7 @@ import { useStore } from '../../store/useStore';
 import { X, FileText, Loader, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '../../utils';
 import type { Transaction } from '../../types';
-import { guessCategory } from '../../utils/pdfParser';
+import { guessCategory, getDuplicateStatus, type DuplicateStatus } from '../../utils/pdfParser';
 
 interface Props { onClose: () => void; }
 
@@ -17,22 +17,7 @@ interface PreviewRow {
   category: Transaction['category'];
   cardId: string;
   selected: boolean;
-  isDuplicate: boolean;
-}
-
-/** 중복 체크: 같은 날짜 + 비슷한 메모 + 같은 금액 */
-function isDuplicateTxn(
-  candidate: { date: string; note: string; amount: number },
-  existing: Transaction[],
-): boolean {
-  const normNote = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-  const candidateNote = normNote(candidate.note);
-  const candidateAmt = Math.abs(candidate.amount);
-  return existing.some(t =>
-    t.date === candidate.date &&
-    Math.abs(Math.abs(t.amount) - candidateAmt) < 0.01 &&
-    normNote(t.note) === candidateNote,
-  );
+  dupStatus: DuplicateStatus;
 }
 
 export function PdfImport({ onClose }: Props) {
@@ -68,7 +53,7 @@ export function PdfImport({ onClose }: Props) {
       }
 
       const preview: PreviewRow[] = parsed.map(p => {
-        const dup = isDuplicateTxn(
+        const dupStatus = getDuplicateStatus(
           { date: p.date, note: p.note, amount: p.amount },
           existingTxns,
         );
@@ -79,8 +64,8 @@ export function PdfImport({ onClose }: Props) {
           type: p.type,
           category: guessCategory(p.note),
           cardId: selectedCard,
-          selected: !dup,   // 중복은 기본 선택 해제
-          isDuplicate: dup,
+          selected: dupStatus === 'none',  // confirmed/possible 중복은 기본 해제
+          dupStatus,
         };
       });
 
@@ -108,7 +93,9 @@ export function PdfImport({ onClose }: Props) {
   }
 
   const allRows = rows.length;
-  const dupCount = rows.filter(r => r.isDuplicate).length;
+  const confirmedDupCount = rows.filter(r => r.dupStatus === 'confirmed').length;
+  const possibleDupCount  = rows.filter(r => r.dupStatus === 'possible').length;
+  const dupCount = confirmedDupCount + possibleDupCount;
   const selectedCount = rows.filter(r => r.selected).length;
   const totalExpense = rows
     .filter(r => r.selected && r.type === 'expense')
@@ -221,9 +208,20 @@ export function PdfImport({ onClose }: Props) {
 
                   {/* Duplicate warning */}
                   {dupCount > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-yellow-400 bg-yellow-900/20 rounded-xl px-3 py-2">
-                      <AlertTriangle size={13} className="flex-shrink-0" />
-                      <span>중복 {dupCount}건 감지 — 기본 선택 해제됨 (필요하면 직접 체크)</span>
+                    <div className="text-xs bg-yellow-900/20 rounded-xl px-3 py-2 space-y-0.5">
+                      {confirmedDupCount > 0 && (
+                        <div className="flex items-center gap-2 text-yellow-400">
+                          <AlertTriangle size={13} className="flex-shrink-0" />
+                          <span>확실한 중복 {confirmedDupCount}건 — 기본 선택 해제 (날짜·금액 완전 일치)</span>
+                        </div>
+                      )}
+                      {possibleDupCount > 0 && (
+                        <div className="flex items-center gap-2 text-orange-400">
+                          <AlertTriangle size={13} className="flex-shrink-0" />
+                          <span>가능성 있는 중복 {possibleDupCount}건 — 기본 선택 해제 (날짜 ±2일 / 금액 ±2% 이내)</span>
+                        </div>
+                      )}
+                      <p className="text-white/40 pl-5">필요하면 직접 체크해서 추가할 수 있어요</p>
                     </div>
                   )}
 
@@ -246,7 +244,7 @@ export function PdfImport({ onClose }: Props) {
                     {rows.map((r, i) => (
                       <label key={i}
                         className={`flex items-center gap-3 px-2 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                          r.isDuplicate ? 'opacity-40' : 'hover:bg-white/5'
+                          r.dupStatus !== 'none' ? 'opacity-40' : 'hover:bg-white/5'
                         }`}
                       >
                         <input type="checkbox" checked={r.selected}
@@ -256,7 +254,8 @@ export function PdfImport({ onClose }: Props) {
                         />
                         <span className="text-xs text-[var(--color-muted)] w-20 flex-shrink-0">{r.date}</span>
                         <span className="text-xs text-[var(--color-text)] flex-1 truncate">
-                          {r.isDuplicate && <span className="mr-1 text-yellow-500">↩</span>}
+                          {r.dupStatus === 'confirmed' && <span className="mr-1 text-yellow-500" title="확실한 중복">⚠</span>}
+                          {r.dupStatus === 'possible'  && <span className="mr-1 text-orange-400" title="가능성 있는 중복">~</span>}
                           {r.note}
                         </span>
                         <span className={`text-xs font-mono flex-shrink-0 ${
