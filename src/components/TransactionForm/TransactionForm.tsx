@@ -94,27 +94,29 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
           ))}
         </div>
 
-        {/* Date & Amount — stacked on mobile to prevent overflow */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%', minWidth: 0 }}>
-          <div style={{ minWidth: 0 }}>
+        {/* Date & Amount — flex row, each field takes equal space */}
+        <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', width: '100%' }}>
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '3px' }}>{T.date_lbl}</div>
             <input type="date" value={date} onChange={e => setDate(e.target.value)}
               style={{
-                width: '100%', minWidth: 0, boxSizing: 'border-box',
+                display: 'block', width: '100%', boxSizing: 'border-box',
                 background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '8px', padding: '6px 8px', fontSize: '12px',
                 color: 'var(--color-text)', outline: 'none',
+                WebkitAppearance: 'none',
               }} />
           </div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
             <div style={{ fontSize: '11px', color: 'var(--color-muted)', marginBottom: '3px' }}>{T.amount_lbl}</div>
             <input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
               step="0.01" min="0"
               style={{
-                width: '100%', minWidth: 0, boxSizing: 'border-box',
+                display: 'block', width: '100%', boxSizing: 'border-box',
                 background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '8px', padding: '6px 8px', fontSize: '12px',
                 color: 'var(--color-text)', outline: 'none', fontFamily: 'monospace',
+                WebkitAppearance: 'none',
               }} />
           </div>
         </div>
