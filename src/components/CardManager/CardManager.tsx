@@ -123,7 +123,13 @@ export function CardManager() {
 
   const maxSpend = Math.max(...Object.values(cardSpend), 1);
   const today = new Date().getDate();
-  const activeCards = cards.filter(c => c.isActive);
+  // Sort active cards by this month's spend (highest first)
+  const activeCards = useMemo(() =>
+    cards
+      .filter(c => c.isActive)
+      .sort((a, b) => (cardSpend[b.id] || 0) - (cardSpend[a.id] || 0)),
+    [cards, cardSpend]
+  );
   const inactiveCards = cards.filter(c => !c.isActive);
 
   function dueDayWarning(day?: number): 'overdue' | 'soon' | 'ok' | null {
@@ -142,9 +148,10 @@ export function CardManager() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIdx = cards.findIndex(c => c.id === active.id);
-      const newIdx = cards.findIndex(c => c.id === over.id);
-      reorderCards(arrayMove(cards, oldIdx, newIdx));
+      const oldIdx = activeCards.findIndex(c => c.id === active.id);
+      const newIdx = activeCards.findIndex(c => c.id === over.id);
+      const reordered = arrayMove(activeCards, oldIdx, newIdx);
+      reorderCards([...reordered, ...inactiveCards]);
     }
   }
 

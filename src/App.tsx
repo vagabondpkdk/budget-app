@@ -1,4 +1,5 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, lazy, Suspense } from 'react';
+const PdfImport = lazy(() => import('./components/PdfImport/PdfImport').then(m => ({ default: m.PdfImport })));
 import { useStore } from './store/useStore';
 import type { SyncStatus } from './store/useStore';
 import { Dashboard } from './components/Dashboard/Dashboard';
@@ -7,7 +8,7 @@ import { CardManager } from './components/CardManager/CardManager';
 import { Analytics } from './components/Analytics/Analytics';
 import { TransactionForm } from './components/TransactionForm/TransactionForm';
 import type { Tab } from './types';
-import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload, Cloud, CloudOff, Loader } from 'lucide-react';
+import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload, Cloud, CloudOff, Loader, CloudUpload } from 'lucide-react';
 import { format } from 'date-fns';
 import { TRANSLATIONS } from './lib/i18n';
 import type { Lang } from './lib/i18n';
@@ -55,12 +56,36 @@ function LangToggle() {
 }
 
 export default function App() {
-  const { activeTab, setActiveTab, exportData, importData, initSync, syncStatus } = useStore();
+  const { activeTab, setActiveTab, importData, initSync, uploadToCloud, syncStatus,
+          transactions, cards, currentYear, currentMonth } = useStore();
   const lang = useStore(s => s.language);
   const T = TRANSLATIONS[lang];
   const fileRef = useRef<HTMLInputElement>(null);
+  const excelImportRef = useRef<HTMLInputElement>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [showPdfImport, setShowPdfImport] = useState(false);
 
   useEffect(() => { initSync(); }, []);
+
+  async function handleExcelImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const { importFromExcel } = await import('./utils/exportImport');
+      const { transactions: newTxns, errors } = await importFromExcel(file);
+      if (newTxns.length === 0) {
+        setImportMsg(`가져올 데이터가 없습니다.${errors.length ? '\n' + errors.slice(0,3).join('\n') : ''}`);
+        return;
+      }
+      const store = useStore.getState();
+      newTxns.forEach(t => store.addTransaction(t));
+      setImportMsg(`✅ ${newTxns.length}건 가져오기 완료${errors.length ? `\n⚠️ ${errors.length}개 행 오류` : ''}`);
+    } catch {
+      setImportMsg('❌ 파일 읽기 실패. 올바른 엑셀 파일인지 확인해주세요.');
+    }
+    setTimeout(() => setImportMsg(null), 4000);
+  }
 
   const NAV_ITEMS: { tab: Tab; icon: React.ComponentType<{ size?: number; className?: string }>; label: string }[] = [
     { tab: 'dashboard', icon: Home, label: T.nav_dashboard },
@@ -123,22 +148,75 @@ export default function App() {
         </nav>
 
         <div className="px-3 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          {/* Cloud save */}
           <button
-            onClick={exportData}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-1"
+            onClick={uploadToCloud}
+            disabled={syncStatus === 'syncing'}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-3 font-medium transition-colors"
+            style={{
+              background: syncStatus === 'syncing' ? 'rgba(255,255,255,0.05)' : 'var(--color-highlight)',
+              color: syncStatus === 'syncing' ? 'var(--color-muted)' : 'white',
+              opacity: syncStatus === 'syncing' ? 0.7 : 1,
+            }}
+          >
+            {syncStatus === 'syncing'
+              ? <><Loader size={14} className="animate-spin" /> 저장 중…</>
+              : <><CloudUpload size={14} /> {T.save_cloud}</>
+            }
+          </button>
+
+          {/* Export */}
+          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>내보내기</p>
+          <button
+            onClick={async () => { const { exportToExcel } = await import('./utils/exportImport'); exportToExcel(transactions, cards); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Download size={14} /> {T.export_data}
+            <Download size={13} /> 엑셀로 내보내기 (.xlsx)
+          </button>
+          <button
+            onClick={async () => { const { exportToPDF } = await import('./utils/exportImport'); exportToPDF(transactions, cards, currentYear, currentMonth); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-3 hover:bg-white/5"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            <Download size={13} /> PDF로 내보내기 (이번 달)
+          </button>
+
+          {/* Import */}
+          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>가져오기</p>
+          <button
+            onClick={() => setShowPdfImport(true)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            <Upload size={13} /> PDF 스테이먼트 가져오기
+          </button>
+          <button
+            onClick={() => excelImportRef.current?.click()}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
+            style={{ color: 'var(--color-muted)' }}
+          >
+            <Upload size={13} /> 엑셀에서 가져오기 (.xlsx)
           </button>
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs mb-2"
-            style={{ color: 'var(--color-muted)' }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-2 hover:bg-white/5"
+            style={{ color: 'var(--color-muted)', opacity: 0.5 }}
           >
-            <Upload size={14} /> {T.import_data}
+            <Upload size={13} /> 백업에서 복원 (.json)
           </button>
+
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
-          <p className="text-center" style={{ fontSize: 10, color: 'var(--color-muted)' }}>
+          <input ref={excelImportRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelImport} />
+
+          {importMsg && (
+            <div className="mt-2 px-3 py-2 rounded-lg text-xs whitespace-pre-line"
+              style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--color-text)' }}>
+              {importMsg}
+            </div>
+          )}
+
+          <p className="text-center mt-2" style={{ fontSize: 10, color: 'var(--color-muted)' }}>
             {format(new Date(), 'yyyy. M. d')}
           </p>
         </div>
@@ -169,7 +247,24 @@ export default function App() {
           }}
         >
           <SyncBadge status={syncStatus} />
-          <LangToggle />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={uploadToCloud}
+              disabled={syncStatus === 'syncing'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{
+                background: syncStatus === 'syncing' ? 'rgba(255,255,255,0.08)' : 'var(--color-highlight)',
+                color: syncStatus === 'syncing' ? 'var(--color-muted)' : 'white',
+              }}
+            >
+              {syncStatus === 'syncing'
+                ? <Loader size={12} className="animate-spin" />
+                : <CloudUpload size={12} />
+              }
+              {syncStatus === 'syncing' ? '저장 중…' : T.save_cloud}
+            </button>
+            <LangToggle />
+          </div>
         </div>
 
         {/* Content — no safe-top here; top bar above handles it */}
@@ -205,6 +300,12 @@ export default function App() {
             <TransactionForm onClose={() => setActiveTab('dashboard')} />
           </div>
         </div>
+      )}
+
+      {showPdfImport && (
+        <Suspense fallback={null}>
+          <PdfImport onClose={() => setShowPdfImport(false)} />
+        </Suspense>
       )}
 
       {/* ── Mobile Bottom Bar ── */}

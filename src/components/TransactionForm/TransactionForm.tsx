@@ -16,7 +16,16 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
   const { cards, addTransaction, updateTransaction } = useStore();
   const lang = useStore(s => s.language);
   const T = TRANSLATIONS[lang];
-  const activeCards = cards.filter(c => c.isActive);
+  const allTransactions = useStore(s => s.transactions);
+
+  // Sort active cards by usage count (most used first)
+  const activeCards = useMemo(() => {
+    const usageCount: Record<string, number> = {};
+    allTransactions.forEach(t => { usageCount[t.cardId] = (usageCount[t.cardId] || 0) + 1; });
+    return cards
+      .filter(c => c.isActive)
+      .sort((a, b) => (usageCount[b.id] || 0) - (usageCount[a.id] || 0));
+  }, [cards, allTransactions]);
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const [date, setDate]           = useState(initialTransaction?.date || initialDate || today);
@@ -29,7 +38,6 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
   const [isRecurring, setIsRecurring] = useState(initialTransaction?.isRecurring || false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const allTransactions = useStore(s => s.transactions);
   const suggestions = useMemo(() => {
     if (note.length < 2) return [];
     const lower = note.toLowerCase();
@@ -157,13 +165,13 @@ export function TransactionForm({ initialDate, initialTransaction, onClose }: Pr
               <button key={cat} type="button" onClick={() => setCategory(cat)} title={cat}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  padding: '4px 2px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-                  minHeight: '40px', minWidth: 0, overflow: 'hidden',
+                  padding: '5px 2px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                  minHeight: '46px', minWidth: 0, overflow: 'hidden',
                   background: category === cat ? 'var(--color-accent)' : 'rgba(255,255,255,0.05)',
                 }}>
-                <span style={{ fontSize: '15px', lineHeight: 1 }}>{getCategoryIcon(cat)}</span>
+                <span style={{ fontSize: '18px', lineHeight: 1 }}>{getCategoryIcon(cat)}</span>
                 <span style={{
-                  fontSize: '7px', marginTop: '2px', lineHeight: 1.1,
+                  fontSize: '10px', marginTop: '3px', lineHeight: 1.2,
                   color: 'var(--color-muted)', textAlign: 'center',
                   width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>

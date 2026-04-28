@@ -108,6 +108,35 @@ export function Analytics() {
       }));
   }, [assets, currentYear, months]);
 
+  // ── User (Kyle/Ella/Both/SA) breakdown for current month ──
+  const USER_COLORS: Record<string, string> = {
+    Kyle: 'var(--color-info)',
+    Ella: '#ec4899',
+    Both: '#A29BFE',
+    SA:   '#FDCB6E',
+  };
+  const USERS = ['Kyle', 'Ella', 'Both', 'SA'] as const;
+
+  const userMonthData = useMemo(() => {
+    const txns = getMonthTransactions(transactions, currentYear, currentMonth);
+    return USERS.map(u => ({
+      user: u,
+      amount: txns.filter(t => t.user === u && t.amount > 0).reduce((s, t) => s + t.amount, 0),
+    }));
+  }, [transactions, currentYear, currentMonth]);
+
+  const userYearlyData = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1;
+      const txns = getMonthTransactions(transactions, currentYear, m);
+      const row: Record<string, number | string> = { month: months[i] };
+      USERS.forEach(u => {
+        row[u] = txns.filter(t => t.user === u && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+      });
+      return row;
+    });
+  }, [transactions, currentYear, months]);
+
   // ── Card spend for current month ──
   const cardMonthData = useMemo(() => {
     const txns = getMonthTransactions(transactions, currentYear, currentMonth);
@@ -169,7 +198,7 @@ export function Analytics() {
             <div className={`rounded-2xl p-3 ${weekDiff > 0 ? 'bg-red-900/30' : 'bg-green-900/30'}`}>
               <p className="text-xs text-[var(--color-muted)]">{T.an_vs_last}</p>
               <p className={`text-lg font-mono font-bold ${weekDiff > 0 ? 'text-[var(--color-highlight)]' : 'text-[var(--color-success)]'}`}>
-                {weekDiff > 0 ? '+' : ''}{weekDiff.toFixed(0)}%
+                {weekDiff > 0 ? '▲' : '▼'}{Math.abs(weekDiff).toFixed(0)}%
               </p>
             </div>
           </div>
@@ -274,6 +303,33 @@ export function Analytics() {
               ))}
             </div>
           </div>
+
+          {/* ── Member breakdown this month ── */}
+          <div className="bg-[var(--color-surface)] rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.an_user_month}</h3>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {userMonthData.map(({ user, amount }) => (
+                <div key={user} className="rounded-xl p-3" style={{ backgroundColor: USER_COLORS[user] + '22', border: `1px solid ${USER_COLORS[user]}44` }}>
+                  <p className="text-xs font-medium mb-1" style={{ color: USER_COLORS[user] }}>{user}</p>
+                  <p className="text-base font-mono font-bold text-[var(--color-text)]">{formatCurrency(amount)}</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2">
+              {userMonthData.filter(d => d.amount > 0).sort((a, b) => b.amount - a.amount).map(({ user, amount }) => {
+                const max = Math.max(...userMonthData.map(d => d.amount), 1);
+                return (
+                  <div key={user} className="flex items-center gap-3">
+                    <span className="text-xs font-medium w-8" style={{ color: USER_COLORS[user] }}>{user}</span>
+                    <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${(amount / max) * 100}%`, backgroundColor: USER_COLORS[user] }} />
+                    </div>
+                    <span className="text-xs font-mono text-[var(--color-text)] w-20 text-right">{formatCurrency(amount)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
 
@@ -311,6 +367,29 @@ export function Analytics() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* ── Member breakdown by month (yearly) ── */}
+          <div className="bg-[var(--color-surface)] rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.an_user_year}</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={userYearlyData} barSize={12}>
+                <XAxis dataKey="month" tick={{ fill: 'var(--color-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis hide />
+                <Tooltip content={<CustomTooltip />} />
+                {USERS.map(u => (
+                  <Bar key={u} dataKey={u} name={u} stackId="a" fill={USER_COLORS[u]} radius={u === 'SA' ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex gap-4 mt-2 justify-center flex-wrap">
+              {USERS.map(u => (
+                <div key={u} className="flex items-center gap-1.5 text-xs text-[var(--color-muted)]">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: USER_COLORS[u] }} />
+                  {u}
+                </div>
+              ))}
             </div>
           </div>
 

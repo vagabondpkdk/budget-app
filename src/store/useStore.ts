@@ -157,7 +157,10 @@ export const useStore = create<StoreState>((set, get) => {
       const transactions = [...get().transactions, newT];
       saveToStorage(LS_TRANSACTIONS, transactions);
       set({ transactions });
-      supabase.from('transactions').insert(txnToDb(newT));
+      // upsert (not insert) so retry is safe if insert was interrupted
+      supabase.from('transactions').upsert(txnToDb(newT)).then(({ error }) => {
+        if (error) console.warn('Transaction sync failed, will retry on next load:', error.message);
+      });
     },
 
     updateTransaction: (id, data) => {
@@ -165,14 +168,18 @@ export const useStore = create<StoreState>((set, get) => {
       saveToStorage(LS_TRANSACTIONS, transactions);
       set({ transactions });
       const updated = transactions.find(t => t.id === id);
-      if (updated) supabase.from('transactions').upsert(txnToDb(updated));
+      if (updated) supabase.from('transactions').upsert(txnToDb(updated)).then(({ error }) => {
+        if (error) console.warn('Update sync failed:', error.message);
+      });
     },
 
     deleteTransaction: (id) => {
       const transactions = get().transactions.filter(t => t.id !== id);
       saveToStorage(LS_TRANSACTIONS, transactions);
       set({ transactions });
-      supabase.from('transactions').delete().eq('id', id);
+      supabase.from('transactions').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Delete sync failed:', error.message);
+      });
     },
 
     // ── Cards ──
@@ -181,7 +188,9 @@ export const useStore = create<StoreState>((set, get) => {
       const cards = [...get().cards, newCard];
       saveToStorage(LS_CARDS, cards);
       set({ cards });
-      supabase.from('cards').insert(cardToDb(newCard));
+      supabase.from('cards').upsert(cardToDb(newCard)).then(({ error }) => {
+        if (error) console.warn('Card sync failed, will retry on next load:', error.message);
+      });
     },
 
     updateCard: (id, data) => {
@@ -189,14 +198,18 @@ export const useStore = create<StoreState>((set, get) => {
       saveToStorage(LS_CARDS, cards);
       set({ cards });
       const updated = cards.find(c => c.id === id);
-      if (updated) supabase.from('cards').upsert(cardToDb(updated));
+      if (updated) supabase.from('cards').upsert(cardToDb(updated)).then(({ error }) => {
+        if (error) console.warn('Card update sync failed:', error.message);
+      });
     },
 
     deleteCard: (id) => {
       const cards = get().cards.filter(c => c.id !== id);
       saveToStorage(LS_CARDS, cards);
       set({ cards });
-      supabase.from('cards').delete().eq('id', id);
+      supabase.from('cards').delete().eq('id', id).then(({ error }) => {
+        if (error) console.warn('Card delete sync failed:', error.message);
+      });
     },
 
     toggleCardActive: (id) => {
@@ -204,7 +217,9 @@ export const useStore = create<StoreState>((set, get) => {
       saveToStorage(LS_CARDS, cards);
       set({ cards });
       const updated = cards.find(c => c.id === id);
-      if (updated) supabase.from('cards').upsert(cardToDb(updated));
+      if (updated) supabase.from('cards').upsert(cardToDb(updated)).then(({ error }) => {
+        if (error) console.warn('Card toggle sync failed:', error.message);
+      });
     },
 
     reorderCards: (cards) => {
@@ -265,29 +280,72 @@ export const useStore = create<StoreState>((set, get) => {
     // ── Cloud sync ──────────────────────────────────────────────────────────
 
     uploadToCloud: async () => {
-      const { transactions, cards, assets } = get();
-      // Batch upload transactions (50 at a time)
-      for (let i = 0; i < transactions.length; i += 50) {
-        await supabase.from('transactions').upsert(transactions.slice(i, i + 50).map(txnToDb));
+      set({ syncStatus: 'syncing' });
+      try {
+        const { transactions, cards, assets } = get();
+        for (let i = 0; i < transactions.length; i += 50) {
+          await supabase.from('transactions').upsert(transactions.slice(i, i + 50).map(txnToDb));
+        }
+        await supabase.from('cards').upsert(cards.map(cardToDb));
+        await supabase.from('monthly_assets').upsert(assets.map(assetToDb));
+        set({ syncStatus: 'synced' });
+      } catch (err) {
+        console.error('Upload failed:', err);
+        set({ syncStatus: 'error' });
       }
-      await supabase.from('cards').upsert(cards.map(cardToDb));
-      await supabase.from('monthly_assets').upsert(assets.map(assetToDb));
     },
 
     initSync: async () => {
       set({ syncStatus: 'syncing' });
       try {
-        const [{ data: txnRows }, { data: cardRows }, { data: assetRows }] = await Promise.all([
-          supabase.from('transactions').select('*'),
-          supabase.from('cards').select('*'),
-          supabase.from('monthly_assets').select('*'),
+        // Fetch all transactions with pagination (Supabase default limit is 1000)
+        async function fetchAll<T>(table: string): Promise<T[]> {
+          const PAGE = 1000;
+          let all: T[] = [];
+          for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase.from(table).select('*').range(from, from + PAGE - 1);
+            if (error || !data || data.length === 0) break;
+            all = all.concat(data as T[]);
+            if (data.length < PAGE) break;
+          }
+          return all;
+        }
+
+        const [txnRows, cardRows, assetRows] = await Promise.all([
+          fetchAll<DbRow>('transactions'),
+          fetchAll<DbRow>('cards'),
+          fetchAll<DbRow>('monthly_assets'),
         ]);
 
         if (txnRows && txnRows.length > 0) {
-          // Cloud has data → use it
-          const transactions = txnRows.map(r => dbToTxn(r as DbRow));
-          const cards = cardRows && cardRows.length > 0 ? cardRows.map(r => dbToCard(r as DbRow)) : get().cards;
-          const assets = assetRows && assetRows.length > 0 ? assetRows.map(r => dbToAsset(r as DbRow)) : get().assets;
+          // ── Merge: cloud wins for known IDs, local-only items get uploaded ──
+          const cloudTxns  = txnRows.map(r => dbToTxn(r));
+          const cloudCards = cardRows && cardRows.length > 0 ? cardRows.map(r => dbToCard(r)) : null;
+
+          // Transactions: preserve local-only (not yet synced to cloud)
+          const cloudTxnIds = new Set(cloudTxns.map(t => t.id));
+          const localOnly   = get().transactions.filter(t => !cloudTxnIds.has(t.id));
+          if (localOnly.length > 0) {
+            // Push local-only transactions up to cloud
+            for (let i = 0; i < localOnly.length; i += 50) {
+              await supabase.from('transactions').upsert(localOnly.slice(i, i + 50).map(txnToDb));
+            }
+          }
+          const transactions = [...cloudTxns, ...localOnly];
+
+          // Cards: same merge — local-only cards get pushed up
+          const cards = (() => {
+            if (!cloudCards) return get().cards;
+            const cloudCardIds = new Set(cloudCards.map(c => c.id));
+            const localOnlyCards = get().cards.filter(c => !cloudCardIds.has(c.id));
+            if (localOnlyCards.length > 0) {
+              supabase.from('cards').upsert(localOnlyCards.map(cardToDb));
+            }
+            return [...cloudCards, ...localOnlyCards];
+          })();
+
+          const assets = assetRows && assetRows.length > 0 ? assetRows.map(r => dbToAsset(r)) : get().assets;
+
           saveToStorage(LS_TRANSACTIONS, transactions);
           saveToStorage(LS_CARDS, cards);
           saveToStorage(LS_ASSETS, assets);
@@ -318,13 +376,24 @@ export const useStore = create<StoreState>((set, get) => {
             saveToStorage(LS_TRANSACTIONS, transactions);
             set({ transactions });
           })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'cards' }, async () => {
-            const { data } = await supabase.from('cards').select('*');
-            if (data) {
-              const cards = data.map(r => dbToCard(r as DbRow));
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cards' }, ({ new: row }) => {
+            const newCard = dbToCard(row as DbRow);
+            if (!get().cards.find(c => c.id === newCard.id)) {
+              const cards = [...get().cards, newCard];
               saveToStorage(LS_CARDS, cards);
               set({ cards });
             }
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cards' }, ({ new: row }) => {
+            const updated = dbToCard(row as DbRow);
+            const cards = get().cards.map(c => c.id === updated.id ? updated : c);
+            saveToStorage(LS_CARDS, cards);
+            set({ cards });
+          })
+          .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'cards' }, ({ old: row }) => {
+            const cards = get().cards.filter(c => c.id !== (row as DbRow).id);
+            saveToStorage(LS_CARDS, cards);
+            set({ cards });
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_assets' }, async () => {
             const { data } = await supabase.from('monthly_assets').select('*');

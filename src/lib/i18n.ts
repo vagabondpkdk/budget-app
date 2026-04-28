@@ -8,7 +8,7 @@ const KO = {
   sync_syncing: '동기화 중…', sync_synced: '동기화됨', sync_offline: '오프라인',
   sync_cloud: '클라우드 동기화 중…',
   // Data
-  export_data: '데이터 내보내기', import_data: '데이터 가져오기',
+  export_data: '데이터 내보내기', import_data: '데이터 가져오기', save_cloud: '클라우드 저장',
   // Date picker
   today: '오늘', months_ko: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
   // Dashboard
@@ -40,7 +40,7 @@ const KO = {
   lang_label: '언어', lang_ko: '한국어', lang_en: 'English',
   // Analytics
   an_weekly: '주간', an_monthly: '월간', an_yearly: '연간',
-  an_this_week: '이번 주 지출', an_vs_last: '전주 대비',
+  an_this_week: '이번 주 지출', an_vs_last: '지난주 대비',
   an_daily_this_week: '이번 주 일별 지출',
   an_month_category: '이번 달 카테고리',
   an_income_expense: (y: number) => `${y}년 수입/지출 추이`,
@@ -51,6 +51,7 @@ const KO = {
   an_annual_income: '연간 수입', an_annual_expense: '연간 지출', an_annual_saving: '연간 저축',
   an_income_label: '수입', an_expense_label: '지출', an_saving_label: '저축',
   an_net_worth_label: '순자산', an_saving_label2: '저축',
+  an_user_month: '멤버별 이번 달 지출', an_user_year: '멤버별 월간 지출 추이',
   // Category labels (Korean)
   cat: {
     'Home Usage': '생활용품', 'Food': '식비', 'Gas': '주유', 'Shopping': '쇼핑',
@@ -69,7 +70,7 @@ const EN = {
   nav_analytics: 'Analytics', nav_add: 'Add', nav_title: 'Budget', nav_subtitle: 'Kyle & Ella',
   sync_syncing: 'Syncing…', sync_synced: 'Synced', sync_offline: 'Offline',
   sync_cloud: 'Cloud syncing…',
-  export_data: 'Export Data', import_data: 'Import Data',
+  export_data: 'Export Data', import_data: 'Import Data', save_cloud: 'Save to Cloud',
   today: 'Today', months_ko: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   income: 'Income', expense: 'Expenses', saving: 'Saving',
   saving_rate: 'Monthly Saving Rate', saving_label: 'Saved',
@@ -93,7 +94,7 @@ const EN = {
   due_banner: (c: string) => `⚠️ Due soon: ${c}`,
   lang_label: 'Language', lang_ko: '한국어', lang_en: 'English',
   an_weekly: 'Weekly', an_monthly: 'Monthly', an_yearly: 'Yearly',
-  an_this_week: 'This Week', an_vs_last: 'vs Last Week',
+  an_this_week: 'This Week', an_vs_last: 'Prev Week',
   an_daily_this_week: 'Daily Expenses This Week',
   an_month_category: 'This Month by Category',
   an_income_expense: (y: number) => `${y} Income vs Expenses`,
@@ -104,6 +105,7 @@ const EN = {
   an_annual_income: 'Annual Income', an_annual_expense: 'Annual Expenses', an_annual_saving: 'Annual Savings',
   an_income_label: 'Income', an_expense_label: 'Expenses', an_saving_label: 'Saving',
   an_net_worth_label: 'Net Worth', an_saving_label2: 'Savings',
+  an_user_month: 'This Month by Member', an_user_year: 'Monthly Spend by Member',
   cat: {
     'Home Usage': 'Home', 'Food': 'Food', 'Gas': 'Gas', 'Shopping': 'Shopping',
     'Market': 'Market', 'Saipan': 'Saipan', 'Travel': 'Travel', 'Bill': 'Bill',
