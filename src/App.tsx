@@ -12,6 +12,7 @@ import { Home, CalendarDays, CreditCard, BarChart3, Plus, Download, Upload, Clou
 import { format } from 'date-fns';
 import { TRANSLATIONS } from './lib/i18n';
 import type { Lang } from './lib/i18n';
+import { APP_VERSION, BUILD_DATE, BUILD_DESC } from './lib/version';
 
 function DueBanner() {
   const cards = useStore(s => s.cards);
@@ -216,9 +217,25 @@ export default function App() {
             </div>
           )}
 
-          <p className="text-center mt-2" style={{ fontSize: 10, color: 'var(--color-muted)' }}>
-            {format(new Date(), 'yyyy. M. d')}
-          </p>
+          <div className="flex items-center justify-between mt-2 px-1">
+            <p style={{ fontSize: 10, color: 'var(--color-muted)' }}>
+              {format(new Date(), 'yyyy. M. d')}
+            </p>
+            <span
+              title={`${BUILD_DATE} · ${BUILD_DESC}`}
+              style={{
+                fontSize: 10,
+                color: 'var(--color-highlight)',
+                background: 'rgba(233,69,96,0.12)',
+                padding: '1px 6px',
+                borderRadius: 6,
+                cursor: 'default',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {APP_VERSION}
+            </span>
+          </div>
         </div>
       </aside>
 

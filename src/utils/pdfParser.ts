@@ -19,22 +19,31 @@ export async function extractPdfText(file: File): Promise<string> {
       const content = await page.getTextContent();
       const items = content.items as any[];
 
-      // Group text items by y-coordinate (rounded to 1pt) to reconstruct lines
-      const lineMap = new Map<number, Array<{ x: number; str: string }>>();
+      // Group text items by y-coordinate with ±3pt tolerance
+      // (PDF columns — date / description / amount — can have slightly different y values)
+      const lineGroups: Array<{ y: number; items: Array<{ x: number; str: string }> }> = [];
+
       for (const item of items) {
         const str: string = item.str ?? '';
         if (!str.trim()) continue;
-        const y = Math.round(item.transform[5]);
-        const x: number = item.transform[4];
-        if (!lineMap.has(y)) lineMap.set(y, []);
-        lineMap.get(y)!.push({ x, str });
+        const iy: number = item.transform[5];
+        const ix: number = item.transform[4];
+
+        // Find existing group within ±3pt
+        const group = lineGroups.find(g => Math.abs(g.y - iy) <= 3);
+        if (group) {
+          group.items.push({ x: ix, str });
+          group.y = (group.y + iy) / 2; // keep running average y
+        } else {
+          lineGroups.push({ y: iy, items: [{ x: ix, str }] });
+        }
       }
 
-      // Sort y descending (top → bottom), x ascending (left → right)
-      const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
-      for (const y of sortedYs) {
-        const segments = lineMap.get(y)!.sort((a, b) => a.x - b.x);
-        const line = segments.map(s => s.str).join(' ').trim();
+      // Sort groups top → bottom, items left → right within each group
+      lineGroups.sort((a, b) => b.y - a.y);
+      for (const group of lineGroups) {
+        group.items.sort((a, b) => a.x - b.x);
+        const line = group.items.map(s => s.str).join(' ').trim();
         if (line) fullText += line + '\n';
       }
 
