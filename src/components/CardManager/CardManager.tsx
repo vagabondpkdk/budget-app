@@ -83,7 +83,7 @@ function SortableCard({
                 warning === 'soon' ? 'text-yellow-300 font-bold' :
                 warning === 'overdue' ? 'text-red-300' : 'text-white/60'
               }`}>
-                {T.due_day} {card.payDueDay}일
+                {T.due_day_label(card.payDueDay)}
                 {warning === 'soon' ? ' ⚠️' : warning === 'overdue' ? ' ✓' : ''}
               </p>
             )}
@@ -221,7 +221,7 @@ export function CardManager() {
                   warning === 'soon' ? 'text-[var(--color-warning)]' :
                   warning === 'overdue' ? 'text-[var(--color-muted)]' : 'text-[var(--color-text)]'
                 }`}>
-                  {card.payDueDay}일
+                  {T.due_day_label(card.payDueDay!)}
                   {warning === 'soon' && <span className="ml-1 text-xs">⚠️ {T.due_soon_label}</span>}
                   {warning === 'overdue' && <span className="ml-1 text-xs">✓ {T.due_overdue_label}</span>}
                 </span>

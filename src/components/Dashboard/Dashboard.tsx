@@ -20,6 +20,7 @@ export function Dashboard() {
   const lang = useStore(s => s.language);
   const T = TRANSLATIONS[lang];
   const [editingT, setEditingT] = useState<Transaction | null>(null);
+  const [filterCat, setFilterCat] = useState<string | null>(null);
 
   const monthTxns = useMemo(
     () => getMonthTransactions(transactions, currentYear, currentMonth),
@@ -132,11 +133,13 @@ export function Dashboard() {
             </ResponsiveContainer>
             <div className="flex-1 space-y-1.5">
               {categoryData.map((item, i) => (
-                <div key={item.name} className="flex items-center gap-2">
+                <button key={item.name}
+                  onClick={() => setFilterCat(item.name)}
+                  className="w-full flex items-center gap-2 hover:bg-white/5 active:bg-white/10 rounded px-1 py-0.5 transition-colors">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                  <span className="text-xs text-[var(--color-muted)] flex-1 truncate">{item.icon} {item.label}</span>
+                  <span className="text-xs text-[var(--color-muted)] flex-1 truncate text-left">{item.icon} {item.label}</span>
                   <span className="text-xs font-mono text-[var(--color-text)]">{formatCurrency(item.value)}</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -163,6 +166,35 @@ export function Dashboard() {
           </div>
         </div>
       )}
+
+      {filterCat && (() => {
+        const catTxns = monthTxns.filter(t => t.category === filterCat);
+        return (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+            onClick={() => setFilterCat(null)}>
+            <div className="w-full max-w-md max-h-[80vh] overflow-y-auto bg-[var(--color-surface)] rounded-2xl"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div>
+                  <h3 className="font-semibold text-[var(--color-text)] text-sm">
+                    {getCategoryIcon(filterCat as any)} {T.filtered_tx(filterCat)}
+                  </h3>
+                  <p className="text-xs text-[var(--color-muted)]">
+                    {formatCurrency(catTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0))}
+                  </p>
+                </div>
+                <button onClick={() => setFilterCat(null)} className="text-[var(--color-muted)] px-2 py-1 rounded hover:bg-white/10">✕</button>
+              </div>
+              <div className="p-3">
+                <TransactionList transactions={catTxns} showDate
+                  onEdit={t => { setFilterCat(null); setEditingT(t); }}
+                  onDelete={id => useStore.getState().deleteTransaction(id)}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

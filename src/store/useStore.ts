@@ -84,14 +84,9 @@ function dbToAsset(r: DbRow): MonthlyAsset {
   };
 }
 
-function getInitialMonth(txns: Transaction[]): { year: number; month: number } {
-  if (txns.length === 0) {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
-  }
-  const latest = txns.reduce((a, b) => a.date > b.date ? a : b);
-  const d = new Date(latest.date + 'T00:00:00');
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+function getInitialMonth(): { year: number; month: number } {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
 
 // ── Store interface ──────────────────────────────────────────────────────────
@@ -138,7 +133,7 @@ interface StoreState {
 
 export const useStore = create<StoreState>((set, get) => {
   const transactions = loadFromStorage(LS_TRANSACTIONS, initialTransactions);
-  const { year: initYear, month: initMonth } = getInitialMonth(transactions);
+  const { year: initYear, month: initMonth } = getInitialMonth();
 
   return {
     transactions,
@@ -293,11 +288,10 @@ export const useStore = create<StoreState>((set, get) => {
           const transactions = txnRows.map(r => dbToTxn(r as DbRow));
           const cards = cardRows && cardRows.length > 0 ? cardRows.map(r => dbToCard(r as DbRow)) : get().cards;
           const assets = assetRows && assetRows.length > 0 ? assetRows.map(r => dbToAsset(r as DbRow)) : get().assets;
-          const { year, month } = getInitialMonth(transactions);
           saveToStorage(LS_TRANSACTIONS, transactions);
           saveToStorage(LS_CARDS, cards);
           saveToStorage(LS_ASSETS, assets);
-          set({ transactions, cards, assets, currentYear: year, currentMonth: month });
+          set({ transactions, cards, assets });
         } else {
           // Cloud is empty → upload local data
           await get().uploadToCloud();

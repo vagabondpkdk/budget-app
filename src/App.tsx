@@ -145,7 +145,7 @@ export default function App() {
       </aside>
 
       {/* ── Main ── */}
-      <main className="flex-1 md:ml-60 flex flex-col" style={{ minHeight: '100vh' }}>
+      <main className="flex-1 md:ml-60 flex flex-col" style={{ minHeight: '100vh', overflowX: 'hidden', maxWidth: '100%' }}>
         {/* Desktop header */}
         <header
           className="hidden md:flex items-center justify-between px-6 py-4 sticky top-0 z-10"
@@ -182,13 +182,30 @@ export default function App() {
           {activeTab === 'daily' && <DailyView />}
           {activeTab === 'cards' && <CardManager />}
           {activeTab === 'analytics' && <Analytics />}
-          {activeTab === 'add' && (
-            <div style={{ maxWidth: 512, margin: '0 auto', width: '100%', minWidth: 0 }}>
-              <TransactionForm onClose={() => setActiveTab('dashboard')} />
-            </div>
-          )}
         </div>
       </main>
+
+      {/* ── Add Transaction Bottom Sheet ── */}
+      {activeTab === 'add' && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setActiveTab('dashboard')}
+        >
+          <div
+            className="w-full overflow-y-auto rounded-t-3xl"
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              maxHeight: '92vh',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 8px)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-1" />
+            <TransactionForm onClose={() => setActiveTab('dashboard')} />
+          </div>
+        </div>
+      )}
 
       {/* ── Mobile Bottom Bar ── */}
       <nav
