@@ -263,7 +263,12 @@ export default function App() {
             backgroundColor: 'var(--color-surface)',
           }}
         >
-          <SyncBadge status={syncStatus} />
+          <div className="flex items-center gap-2">
+            <SyncBadge status={syncStatus} />
+            <span style={{ fontSize: 10, color: 'var(--color-highlight)', background: 'rgba(233,69,96,0.15)', padding: '1px 6px', borderRadius: 6 }}>
+              {APP_VERSION}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={uploadToCloud}
