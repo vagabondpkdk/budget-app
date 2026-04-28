@@ -12,14 +12,33 @@ export async function extractPdfText(file: File): Promise<string> {
   const pdf = await loadingTask.promise;
 
   let fullText = '';
+
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = (content.items as any[])
-      .map((item: any) => (item.str ?? ''))
-      .join(' ');
-    fullText += pageText + '\n';
+    const items = content.items as any[];
+
+    // Group text items by y-coordinate (rounded to 1pt) to reconstruct lines
+    const lineMap = new Map<number, Array<{ x: number; str: string }>>();
+    for (const item of items) {
+      const str: string = item.str ?? '';
+      if (!str.trim()) continue;
+      // transform = [a, b, c, d, x, y]
+      const y = Math.round(item.transform[5]);
+      const x: number = item.transform[4];
+      if (!lineMap.has(y)) lineMap.set(y, []);
+      lineMap.get(y)!.push({ x, str });
+    }
+
+    // Sort y descending (top → bottom of page), x ascending (left → right)
+    const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+    for (const y of sortedYs) {
+      const segments = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+      const line = segments.map(s => s.str).join(' ').trim();
+      if (line) fullText += line + '\n';
+    }
   }
+
   return fullText;
 }
 
