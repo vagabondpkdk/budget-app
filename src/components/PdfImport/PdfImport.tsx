@@ -54,14 +54,14 @@ export function PdfImport({ onClose }: Props) {
       setParseProgress(`파일 분석 중 ${i + 1} / ${files.length} — ${file.name}`);
       try {
         const text = await extractPdfText(file);
-        if (i === 0) setRawTextPreview(text.slice(0, 800));
+        if (i === 0) setRawTextPreview(text.slice(0, 800) || '(텍스트 없음)');
 
         const detectedBank = detectBank(text);
         if (!detectedBanks.includes(detectedBank)) detectedBanks.push(detectedBank);
 
         const parsed = parseTransactions(text, detectedBank);
         if (parsed.length === 0) {
-          errors.push(`${file.name}: 거래 내역을 찾지 못했어요`);
+          errors.push(`${file.name} [${detectedBank}]: 거래 내역을 찾지 못했어요`);
           continue;
         }
 
@@ -80,7 +80,8 @@ export function PdfImport({ onClose }: Props) {
           });
         }
       } catch (e: any) {
-        errors.push(`${file.name}: ${e?.message ?? '알 수 없는 오류'}`);
+        errors.push(`${file.name}: 오류 — ${e?.message ?? '알 수 없는 오류'}`);
+        if (i === 0) setRawTextPreview('(오류로 추출 실패)');
       }
     }
 

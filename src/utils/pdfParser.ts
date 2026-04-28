@@ -13,29 +13,36 @@ export async function extractPdfText(file: File): Promise<string> {
 
   let fullText = '';
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const items = content.items as any[];
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const items = content.items as any[];
 
-    // Group text items by y-coordinate (rounded to 1pt) to reconstruct lines
-    const lineMap = new Map<number, Array<{ x: number; str: string }>>();
-    for (const item of items) {
-      const str: string = item.str ?? '';
-      if (!str.trim()) continue;
-      const y = Math.round(item.transform[5]);
-      const x: number = item.transform[4];
-      if (!lineMap.has(y)) lineMap.set(y, []);
-      lineMap.get(y)!.push({ x, str });
-    }
+      // Group text items by y-coordinate (rounded to 1pt) to reconstruct lines
+      const lineMap = new Map<number, Array<{ x: number; str: string }>>();
+      for (const item of items) {
+        const str: string = item.str ?? '';
+        if (!str.trim()) continue;
+        const y = Math.round(item.transform[5]);
+        const x: number = item.transform[4];
+        if (!lineMap.has(y)) lineMap.set(y, []);
+        lineMap.get(y)!.push({ x, str });
+      }
 
-    // Sort y descending (top → bottom), x ascending (left → right)
-    const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
-    for (const y of sortedYs) {
-      const segments = lineMap.get(y)!.sort((a, b) => a.x - b.x);
-      const line = segments.map(s => s.str).join(' ').trim();
-      if (line) fullText += line + '\n';
+      // Sort y descending (top → bottom), x ascending (left → right)
+      const sortedYs = Array.from(lineMap.keys()).sort((a, b) => b - a);
+      for (const y of sortedYs) {
+        const segments = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+        const line = segments.map(s => s.str).join(' ').trim();
+        if (line) fullText += line + '\n';
+      }
+
+      page.cleanup();
     }
+  } finally {
+    // 반드시 메모리 해제 — 여러 파일 연속 처리 시 worker 메모리 누수 방지
+    await pdf.destroy();
   }
 
   return fullText;
