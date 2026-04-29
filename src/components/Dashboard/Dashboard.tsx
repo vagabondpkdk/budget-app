@@ -15,6 +15,13 @@ import { TRANSLATIONS, tCat } from '../../lib/i18n';
 
 const CHART_COLORS = ['var(--color-highlight)', 'var(--color-info)', 'var(--color-success)', 'var(--color-warning)', '#A78BFA', '#F472B6'];
 
+type WeekEntry = {
+  label: string; weekNum: number; amount: number;
+  txns: Transaction[];
+  dailyTotals: { day: number; date: string; amount: number }[];
+  dateRange: string;
+};
+
 export function Dashboard() {
   const { transactions, currentYear, currentMonth, setActiveTab } = useStore();
   const lang = useStore(s => s.language);
@@ -22,6 +29,7 @@ export function Dashboard() {
   const [editingT, setEditingT] = useState<Transaction | null>(null);
   const [filterCat, setFilterCat] = useState<string | null>(null);
   const [drillDown, setDrillDown] = useState<'income' | 'expense' | 'refund' | 'saving' | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<WeekEntry | null>(null);
 
   const monthTxns = useMemo(
     () => getMonthTransactions(transactions, currentYear, currentMonth),
@@ -33,18 +41,33 @@ export function Dashboard() {
     [monthTxns]
   );
 
-  const weeklyData = useMemo(() => {
+  const weeklyData = useMemo((): WeekEntry[] => {
     const daysInMonth = getDaysInMonth(new Date(currentYear, currentMonth - 1));
-    const weeks: { week: string; amount: number }[] = [];
+    const mm = String(currentMonth).padStart(2, '0');
+    const weeks: WeekEntry[] = [];
     for (let w = 0; w < 5; w++) {
       const start = w * 7 + 1;
       const end = Math.min(start + 6, daysInMonth);
+      if (start > daysInMonth) break;
       let total = 0;
+      const txns: Transaction[] = [];
+      const dailyTotals: { day: number; date: string; amount: number }[] = [];
       for (let d = start; d <= end; d++) {
-        const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        monthTxns.filter(t => t.date === dateStr && t.amount > 0).forEach(t => total += t.amount);
+        const dateStr = `${currentYear}-${mm}-${String(d).padStart(2, '0')}`;
+        const dayTxns = monthTxns.filter(t => t.date === dateStr && t.amount > 0);
+        const dayAmt = dayTxns.reduce((s, t) => s + t.amount, 0);
+        dayTxns.forEach(t => total += t.amount);
+        txns.push(...dayTxns);
+        dailyTotals.push({ day: d, date: dateStr, amount: dayAmt });
       }
-      if (start <= daysInMonth) weeks.push({ week: `W${w + 1}`, amount: total });
+      weeks.push({
+        label: `${start}–${end}`,
+        weekNum: w,
+        amount: total,
+        txns: [...txns].sort((a, b) => b.date.localeCompare(a.date)),
+        dailyTotals,
+        dateRange: `${currentMonth}/${start} – ${currentMonth}/${end}`,
+      });
     }
     return weeks;
   }, [monthTxns, currentYear, currentMonth]);
@@ -121,14 +144,23 @@ export function Dashboard() {
       </div>
 
       <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-muted)', opacity: 0.7 }}>{T.weekly_expense}</h3>
-        <ResponsiveContainer width="100%" height={120}>
-          <BarChart data={weeklyData} barSize={32}>
-            <XAxis dataKey="week" tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-muted)', opacity: 0.7 }}>{T.weekly_expense}</h3>
+          <span className="text-xs" style={{ color: 'var(--color-muted)', opacity: 0.5 }}>탭하면 상세 보기</span>
+        </div>
+        <ResponsiveContainer width="100%" height={130}>
+          <BarChart data={weeklyData} barSize={36}
+            onClick={(data) => {
+              if (data?.activeTooltipIndex != null) setSelectedWeek(weeklyData[data.activeTooltipIndex]);
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <XAxis dataKey="label" tick={{ fill: 'var(--color-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis hide />
             <Tooltip
               contentStyle={{ background: 'var(--color-accent)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, fontSize: 12 }}
               formatter={(v: unknown) => [formatCurrency(Number(v ?? 0)), T.expense]}
+              labelFormatter={(label) => `${currentMonth}월 ${label}일`}
               labelStyle={{ color: 'var(--color-muted)' }}
             />
             <Bar dataKey="amount" radius={[6, 6, 2, 2]}>
@@ -136,7 +168,7 @@ export function Dashboard() {
                 <Cell key={i}
                   fill={i === Math.floor((new Date().getDate() - 1) / 7)
                     ? 'var(--color-highlight)'
-                    : 'color-mix(in srgb, var(--color-highlight) 22%, var(--color-accent))'}
+                    : 'rgba(255,255,255,0.12)'}
                 />
               ))}
             </Bar>
@@ -184,6 +216,63 @@ export function Dashboard() {
           onDelete={id => useStore.getState().deleteTransaction(id)}
         />
       </div>
+
+      {/* ── 주간 드릴다운 모달 ── */}
+      {selectedWeek && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => setSelectedWeek(null)}>
+          <div className="w-full max-w-md max-h-[85vh] flex flex-col bg-[var(--color-surface)] rounded-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
+                  {currentMonth}월 {selectedWeek.dateRange.split(' – ')[0].split('/')[1]}–{selectedWeek.dateRange.split(' – ')[1].split('/')[1]}일
+                </h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>
+                  {selectedWeek.txns.length}건 · {formatCurrency(selectedWeek.amount)}
+                </p>
+              </div>
+              <button onClick={() => setSelectedWeek(null)}
+                className="text-[var(--color-muted)] hover:text-white px-2 py-1 rounded hover:bg-white/10 text-lg leading-none">✕</button>
+            </div>
+
+            {/* 일별 미니 바 차트 */}
+            {selectedWeek.dailyTotals.some(d => d.amount > 0) && (
+              <div className="px-4 pt-3 pb-1 flex-shrink-0">
+                <p className="text-xs mb-2" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>일별 지출</p>
+                <ResponsiveContainer width="100%" height={64}>
+                  <BarChart data={selectedWeek.dailyTotals} barSize={20}>
+                    <XAxis dataKey="day" tick={{ fill: 'var(--color-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={{ background: 'var(--color-accent)', border: 'none', borderRadius: 8, fontSize: 11 }}
+                      formatter={(v: unknown) => [formatCurrency(Number(v ?? 0)), '']}
+                      labelFormatter={(d) => `${currentMonth}/${d}`}
+                      labelStyle={{ color: 'var(--color-muted)' }}
+                    />
+                    <Bar dataKey="amount" radius={[4, 4, 1, 1]}
+                      fill="var(--color-highlight)" opacity={0.85} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* 거래 목록 */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {selectedWeek.txns.length === 0
+                ? <p className="text-sm text-center py-8" style={{ color: 'var(--color-muted)' }}>이 주에 지출 없음</p>
+                : <TransactionList
+                    transactions={selectedWeek.txns}
+                    showDate
+                    onEdit={t => { setSelectedWeek(null); setEditingT(t); }}
+                    onDelete={id => useStore.getState().deleteTransaction(id)}
+                  />
+              }
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingT && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4">
