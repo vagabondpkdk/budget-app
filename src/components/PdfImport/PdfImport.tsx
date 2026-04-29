@@ -13,7 +13,7 @@ interface PreviewRow {
   date: string;
   note: string;
   amount: number;
-  type: 'expense' | 'income' | 'cashback';
+  type: 'expense' | 'income' | 'cashback' | 'refund';
   category: Transaction['category'];
   cardId: string;
   selected: boolean;
@@ -32,78 +32,79 @@ export function PdfImport({ onClose }: Props) {
   const [selectedCard, setSelectedCard] = useState(activeCards[0]?.id ?? '');
   const [error, setError]               = useState('');
   const [parseProgress, setParseProgress] = useState('');
-  const [rawTextPreview, setRawTextPreview] = useState('');
   const [importedCount, setImportedCount]   = useState(0);
   const [fileErrors, setFileErrors]         = useState<string[]>([]);
 
-  async function handleFiles(files: FileList) {
-    if (!files.length) return;
-    setStep('parsing');
-    setError('');
-    setFileErrors([]);
-    setBanks([]);
+  async function handleFiles(fileArray: File[]) {
+    try {
+      if (!fileArray.length) return;
 
-    const { extractPdfText, detectBank, parseTransactions } = await import('../../utils/pdfParser');
+      setStep('parsing');
+      setError('');
+      setFileErrors([]);
+      setBanks([]);
 
-    const allRows: PreviewRow[] = [];
-    const detectedBanks: string[] = [];
-    const errors: string[] = [];
+      const { extractPdfText, detectBank, parseTransactions } = await import('../../utils/pdfParser');
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setParseProgress(`파일 분석 중 ${i + 1} / ${files.length} — ${file.name}`);
-      try {
-        const text = await extractPdfText(file);
-        if (i === 0) setRawTextPreview(text.slice(0, 800) || '(텍스트 없음)');
+      const allRows: PreviewRow[] = [];
+      const detectedBanks: string[] = [];
+      const errors: string[] = [];
 
-        const detectedBank = detectBank(text);
-        if (!detectedBanks.includes(detectedBank)) detectedBanks.push(detectedBank);
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setParseProgress(`파일 분석 중 ${i + 1} / ${fileArray.length} — ${file.name}`);
+        try {
+          const text = await extractPdfText(file);
+          const detectedBank = detectBank(text);
+          if (!detectedBanks.includes(detectedBank)) detectedBanks.push(detectedBank);
 
-        const parsed = parseTransactions(text, detectedBank);
-        if (parsed.length === 0) {
-          errors.push(`${file.name} [${detectedBank}]: 거래 내역을 찾지 못했어요`);
-          continue;
+          const parsed = parseTransactions(text, detectedBank);
+          if (parsed.length === 0) {
+            errors.push(`${file.name} [${detectedBank}]: 거래 내역을 찾지 못했어요`);
+            continue;
+          }
+
+          for (const p of parsed) {
+            const dupStatus = getDuplicateStatus(
+              { date: p.date, note: p.note, amount: p.amount },
+              existingTxns,
+            );
+            allRows.push({
+              date: p.date, note: p.note, amount: p.amount,
+              type: p.type, category: guessCategory(p.note),
+              cardId: selectedCard,
+              selected: dupStatus === 'none',
+              dupStatus,
+              bank: detectedBank,
+            });
+          }
+        } catch (e: any) {
+          errors.push(`${file.name}: 오류 — ${e?.message ?? '알 수 없는 오류'}`);
         }
-
-        for (const p of parsed) {
-          const dupStatus = getDuplicateStatus(
-            { date: p.date, note: p.note, amount: p.amount },
-            existingTxns,
-          );
-          allRows.push({
-            date: p.date, note: p.note, amount: p.amount,
-            type: p.type, category: guessCategory(p.note),
-            cardId: selectedCard,
-            selected: dupStatus === 'none',
-            dupStatus,
-            bank: detectedBank,
-          });
-        }
-      } catch (e: any) {
-        errors.push(`${file.name}: 오류 — ${e?.message ?? '알 수 없는 오류'}`);
-        if (i === 0) setRawTextPreview('(오류로 추출 실패)');
       }
-    }
 
-    setBanks(detectedBanks);
-    setFileErrors(errors);
+      setBanks(detectedBanks);
+      setFileErrors(errors);
 
-    if (allRows.length === 0) {
-      setError('선택한 파일에서 거래 내역을 찾지 못했어요. 추출된 텍스트를 확인해주세요.');
+      if (allRows.length === 0) {
+        setError('선택한 파일에서 거래 내역을 찾지 못했어요.');
+        setStep('preview');
+        return;
+      }
+
+      allRows.sort((a, b) => a.date.localeCompare(b.date));
+      setRows(allRows);
       setStep('preview');
-      return;
+    } catch (e: any) {
+      setError(`오류가 발생했어요: ${(e as any)?.message ?? '알 수 없는 오류'}`);
+      setStep('preview');
     }
-
-    // 날짜 순 정렬
-    allRows.sort((a, b) => a.date.localeCompare(b.date));
-    setRows(allRows);
-    setStep('preview');
   }
 
   function handleImport() {
     const toImport = rows.filter(r => r.selected);
     toImport.forEach(r => {
-      const finalAmount = (r.type === 'income' || r.type === 'cashback')
+      const finalAmount = (r.type === 'income' || r.type === 'cashback' || r.type === 'refund')
         ? -Math.abs(r.amount) : Math.abs(r.amount);
       addTransaction({
         date: r.date, note: r.note, amount: finalAmount,
@@ -189,7 +190,11 @@ export function PdfImport({ onClose }: Props) {
               )}
               <input
                 ref={fileRef} type="file" accept=".pdf" multiple className="hidden"
-                onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ''; }}
+                onChange={e => {
+                  const snapped = Array.from(e.target.files ?? []);
+                  e.target.value = ''; // reset input so same file can be re-selected
+                  if (snapped.length) handleFiles(snapped);
+                }}
               />
             </div>
           )}
@@ -211,14 +216,6 @@ export function PdfImport({ onClose }: Props) {
                 <div className="text-xs text-yellow-400 bg-yellow-900/20 rounded-xl p-3 space-y-1">
                   {error && <p>{error}</p>}
                   {fileErrors.map((e, i) => <p key={i}>⚠ {e}</p>)}
-                  {rawTextPreview && (
-                    <details>
-                      <summary className="cursor-pointer text-[var(--color-muted)] mt-1">추출된 텍스트 미리보기</summary>
-                      <pre className="mt-2 text-xs text-[var(--color-muted)] whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
-                        {rawTextPreview}
-                      </pre>
-                    </details>
-                  )}
                 </div>
               )}
 
@@ -305,9 +302,9 @@ export function PdfImport({ onClose }: Props) {
                           {r.note}
                         </span>
                         <span className={`text-xs font-mono flex-shrink-0 ${
-                          r.type === 'income' || r.type === 'cashback' ? 'text-[var(--color-success)]' : 'text-[var(--color-text)]'
+                          r.type === 'income' || r.type === 'cashback' || r.type === 'refund' ? 'text-[var(--color-success)]' : 'text-[var(--color-text)]'
                         }`}>
-                          {r.type === 'income' || r.type === 'cashback' ? '-' : '+'}
+                          {r.type === 'income' || r.type === 'cashback' || r.type === 'refund' ? '-' : '+'}
                           {formatCurrency(r.amount)}
                         </span>
                       </label>

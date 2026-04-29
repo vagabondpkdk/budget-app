@@ -9,6 +9,11 @@ const KO = {
   sync_cloud: '클라우드 동기화 중…',
   // Data
   export_data: '데이터 내보내기', import_data: '데이터 가져오기', save_cloud: '클라우드 저장',
+  syncing_label: '저장 중…',
+  section_export: '내보내기', section_import: '가져오기',
+  export_excel: '엑셀로 내보내기 (.xlsx)', export_pdf: 'PDF로 내보내기 (이번 달)',
+  import_pdf: 'PDF 스테이먼트 가져오기', import_excel: '엑셀에서 가져오기 (.xlsx)',
+  import_json: '백업에서 복원 (.json)',
   // Date picker
   today: '오늘', months_ko: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
   // Dashboard
@@ -71,6 +76,11 @@ const EN = {
   sync_syncing: 'Syncing…', sync_synced: 'Synced', sync_offline: 'Offline',
   sync_cloud: 'Cloud syncing…',
   export_data: 'Export Data', import_data: 'Import Data', save_cloud: 'Save to Cloud',
+  syncing_label: 'Saving…',
+  section_export: 'Export', section_import: 'Import',
+  export_excel: 'Export to Excel (.xlsx)', export_pdf: 'Export PDF (this month)',
+  import_pdf: 'Import PDF Statement', import_excel: 'Import from Excel (.xlsx)',
+  import_json: 'Restore from Backup (.json)',
   today: 'Today', months_ko: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
   income: 'Income', expense: 'Expenses', saving: 'Saving',
   saving_rate: 'Monthly Saving Rate', saving_label: 'Saved',

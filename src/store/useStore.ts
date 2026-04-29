@@ -6,10 +6,52 @@ import { generateId } from '../utils';
 import { supabase } from '../lib/supabase';
 
 const LS_LANGUAGE = 'budget-app-language';
+const LS_THEME    = 'budget-app-theme';
 
 const LS_TRANSACTIONS = 'budget-app-transactions';
 const LS_CARDS = 'budget-app-cards';
 const LS_ASSETS = 'budget-app-assets';
+const LS_MIGRATION_V2 = 'budget-migration-type-fix-v2'; // v2: Payment 카테고리는 'payment'으로 분리
+
+/**
+ * 진짜 수입 카테고리 세트
+ */
+const REAL_INCOME_CATEGORIES = new Set([
+  'Income', 'Bonus', 'Incentive', 'From Korea', 'Interest', 'Investment',
+  'Apple Cash', 'Recycle',
+]);
+
+/** 카드 결제 카테고리 — 예산 계산에서 제외 */
+const PAYMENT_CATEGORIES = new Set(['Payment', 'Statement Credit']);
+
+/**
+ * type 교정 마이그레이션 (v2):
+ *  - type:'income' + category in PAYMENT_CATEGORIES  → type:'payment'
+ *  - type:'income' + category NOT in REAL_INCOME_CATEGORIES → type:'refund'
+ *  - 나머지는 그대로
+ */
+function migrateTransactionTypes(txns: Transaction[]): { transactions: Transaction[]; changedIds: string[] } {
+  const changedIds: string[] = [];
+  const transactions = txns.map(t => {
+    if (t.type === 'income') {
+      if (PAYMENT_CATEGORIES.has(t.category)) {
+        changedIds.push(t.id);
+        return { ...t, type: 'payment' as Transaction['type'] };
+      }
+      if (!REAL_INCOME_CATEGORIES.has(t.category)) {
+        changedIds.push(t.id);
+        return { ...t, type: 'refund' as Transaction['type'] };
+      }
+    }
+    // v1에서 refund로 잘못 간 Payment 카테고리도 교정
+    if (t.type === 'refund' && PAYMENT_CATEGORIES.has(t.category)) {
+      changedIds.push(t.id);
+      return { ...t, type: 'payment' as Transaction['type'] };
+    }
+    return t;
+  });
+  return { transactions, changedIds };
+}
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -103,9 +145,11 @@ interface StoreState {
   currentMonth: number;
   syncStatus: SyncStatus;
   language: Lang;
+  theme: string;
 
   setActiveTab: (tab: Tab) => void;
   setLanguage: (lang: Lang) => void;
+  setTheme: (theme: string) => void;
   setSelectedDate: (date: string | null) => void;
   setCurrentMonth: (year: number, month: number) => void;
 
@@ -132,8 +176,29 @@ interface StoreState {
 // ── Store ────────────────────────────────────────────────────────────────────
 
 export const useStore = create<StoreState>((set, get) => {
-  const transactions = loadFromStorage(LS_TRANSACTIONS, initialTransactions);
+  // 로컬 데이터 로드 후 1회 마이그레이션 (type 교정 v2)
+  let transactions = loadFromStorage(LS_TRANSACTIONS, initialTransactions);
+  if (!localStorage.getItem(LS_MIGRATION_V2)) {
+    const { transactions: migrated, changedIds } = migrateTransactionTypes(transactions);
+    if (changedIds.length > 0) {
+      transactions = migrated;
+      saveToStorage(LS_TRANSACTIONS, transactions);
+      setTimeout(() => {
+        const changed = transactions.filter(t => changedIds.includes(t.id));
+        for (let i = 0; i < changed.length; i += 50) {
+          supabase.from('transactions').upsert(changed.slice(i, i + 50).map(txnToDb));
+        }
+      }, 2000);
+    }
+    localStorage.setItem(LS_MIGRATION_V2, '1');
+  }
   const { year: initYear, month: initMonth } = getInitialMonth();
+
+  // Apply saved theme to DOM immediately (prevents flash)
+  const initialTheme = loadFromStorage(LS_THEME, 'obsidian') as string;
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.theme = initialTheme;
+  }
 
   return {
     transactions,
@@ -145,11 +210,17 @@ export const useStore = create<StoreState>((set, get) => {
     currentMonth: initMonth,
     syncStatus: 'idle',
     language: (loadFromStorage(LS_LANGUAGE, 'ko') as Lang),
+    theme: initialTheme,
 
     setActiveTab: (tab) => set({ activeTab: tab }),
     setSelectedDate: (date) => set({ selectedDate: date }),
     setCurrentMonth: (year, month) => set({ currentYear: year, currentMonth: month }),
     setLanguage: (lang) => { saveToStorage(LS_LANGUAGE, lang); set({ language: lang }); },
+    setTheme: (theme) => {
+      saveToStorage(LS_THEME, theme);
+      document.documentElement.dataset.theme = theme;
+      set({ theme });
+    },
 
     // ── Transactions ──
     addTransaction: (t) => {
@@ -319,8 +390,19 @@ export const useStore = create<StoreState>((set, get) => {
 
         if (txnRows && txnRows.length > 0) {
           // ── Merge: cloud wins for known IDs, local-only items get uploaded ──
-          const cloudTxns  = txnRows.map(r => dbToTxn(r));
+          let cloudTxns  = txnRows.map(r => dbToTxn(r));
           const cloudCards = cardRows && cardRows.length > 0 ? cardRows.map(r => dbToCard(r)) : null;
+
+          // ── type 교정 마이그레이션 v2 (클라우드 데이터에도 적용) ──
+          const { transactions: migratedCloud, changedIds } = migrateTransactionTypes(cloudTxns);
+          cloudTxns = migratedCloud;
+          if (changedIds.length > 0) {
+            const toFix = cloudTxns.filter(t => changedIds.includes(t.id));
+            for (let i = 0; i < toFix.length; i += 50) {
+              await supabase.from('transactions').upsert(toFix.slice(i, i + 50).map(txnToDb));
+            }
+          }
+          localStorage.setItem(LS_MIGRATION_V2, '1');
 
           // Transactions: preserve local-only (not yet synced to cloud)
           const cloudTxnIds = new Set(cloudTxns.map(t => t.id));

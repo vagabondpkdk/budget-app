@@ -24,12 +24,12 @@ export function TransactionList({ transactions, showDate = false, onEdit, onDele
   }
 
   return (
-    <div className="space-y-1">
+    <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
       {transactions.map(t => (
         <div
           key={t.id}
           onClick={() => onEdit?.(t)}
-          className={`flex items-center gap-3 rounded-lg transition-colors cursor-pointer active:bg-white/10 hover:bg-white/5 ${compact ? 'px-2 py-1.5' : 'px-3 py-2.5'}`}
+          className={`flex items-center gap-3 rounded-lg transition-colors cursor-pointer active:bg-white/10 hover:bg-white/5 ${compact ? 'px-2 py-2' : 'px-3 py-3'}`}
         >
           <CategoryIcon category={t.category} size={compact ? 'sm' : 'md'} />
           <div className="flex-1 min-w-0">

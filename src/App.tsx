@@ -56,6 +56,42 @@ function LangToggle() {
   );
 }
 
+const THEMES: { id: string; color: string; label: string }[] = [
+  { id: 'navy',     color: '#E94560', label: 'Navy' },
+  { id: 'obsidian', color: '#7C6FCD', label: 'Obsidian' },
+  { id: 'zinc',     color: '#F59E0B', label: 'Zinc' },
+  { id: 'jade',     color: '#10B981', label: 'Jade' },
+  { id: 'slate',    color: '#38BDF8', label: 'Slate' },
+];
+
+function ThemeToggle() {
+  const { theme, setTheme } = useStore();
+  return (
+    <div className="flex gap-1.5 items-center">
+      {THEMES.map(t => (
+        <button
+          key={t.id}
+          title={t.label}
+          onClick={() => setTheme(t.id)}
+          style={{
+            width: 15,
+            height: 15,
+            borderRadius: '50%',
+            background: t.color,
+            border: `2px solid ${theme === t.id ? 'rgba(255,255,255,0.9)' : 'transparent'}`,
+            boxShadow: theme === t.id ? `0 0 0 1.5px ${t.color}80` : 'none',
+            padding: 0,
+            cursor: 'pointer',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+            transform: theme === t.id ? 'scale(1.25)' : 'scale(1)',
+            flexShrink: 0,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function App() {
   const { activeTab, setActiveTab, importData, initSync, uploadToCloud, syncStatus,
           transactions, cards, currentYear, currentMonth } = useStore();
@@ -65,6 +101,7 @@ export default function App() {
   const excelImportRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [showPdfImport, setShowPdfImport] = useState(false);
+  const [showVersionInfo, setShowVersionInfo] = useState(false);
 
   useEffect(() => { initSync(); }, []);
 
@@ -121,11 +158,21 @@ export default function App() {
         style={{ width: 240, backgroundColor: 'var(--color-surface)', borderRight: '1px solid rgba(255,255,255,0.05)' }}
       >
         <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>💰 Budget</h1>
-          <p className="text-xs mt-0.5 mb-2" style={{ color: 'var(--color-muted)' }}>Kyle & Ella</p>
+          <div className="flex items-center gap-2.5 mb-0.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+              style={{ background: 'var(--color-highlight)', boxShadow: '0 2px 8px color-mix(in srgb, var(--color-highlight) 40%, transparent)' }}>
+              💰
+            </div>
+            <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--color-text)' }}>Budget</h1>
+          </div>
+          <p className="text-xs mb-2 pl-0.5" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>Kyle & Ella</p>
           <div className="flex items-center justify-between">
             <SyncBadge status={syncStatus} />
             <LangToggle />
+          </div>
+          <div className="flex items-center justify-between mt-2.5">
+            <span style={{ fontSize: 10, color: 'var(--color-muted)', opacity: 0.6 }}>Theme</span>
+            <ThemeToggle />
           </div>
         </div>
 
@@ -161,50 +208,50 @@ export default function App() {
             }}
           >
             {syncStatus === 'syncing'
-              ? <><Loader size={14} className="animate-spin" /> 저장 중…</>
+              ? <><Loader size={14} className="animate-spin" /> {T.syncing_label}</>
               : <><CloudUpload size={14} /> {T.save_cloud}</>
             }
           </button>
 
           {/* Export */}
-          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>내보내기</p>
+          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>{T.section_export}</p>
           <button
             onClick={async () => { const { exportToExcel } = await import('./utils/exportImport'); exportToExcel(transactions, cards); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Download size={13} /> 엑셀로 내보내기 (.xlsx)
+            <Download size={13} /> {T.export_excel}
           </button>
           <button
             onClick={async () => { const { exportToPDF } = await import('./utils/exportImport'); exportToPDF(transactions, cards, currentYear, currentMonth); }}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-3 hover:bg-white/5"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Download size={13} /> PDF로 내보내기 (이번 달)
+            <Download size={13} /> {T.export_pdf}
           </button>
 
           {/* Import */}
-          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>가져오기</p>
+          <p className="text-xs px-3 mb-1" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>{T.section_import}</p>
           <button
             onClick={() => setShowPdfImport(true)}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Upload size={13} /> PDF 스테이먼트 가져오기
+            <Upload size={13} /> {T.import_pdf}
           </button>
           <button
             onClick={() => excelImportRef.current?.click()}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-1 hover:bg-white/5"
             style={{ color: 'var(--color-muted)' }}
           >
-            <Upload size={13} /> 엑셀에서 가져오기 (.xlsx)
+            <Upload size={13} /> {T.import_excel}
           </button>
           <button
             onClick={() => fileRef.current?.click()}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs mb-2 hover:bg-white/5"
             style={{ color: 'var(--color-muted)', opacity: 0.5 }}
           >
-            <Upload size={13} /> 백업에서 복원 (.json)
+            <Upload size={13} /> {T.import_json}
           </button>
 
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
@@ -226,7 +273,7 @@ export default function App() {
               style={{
                 fontSize: 10,
                 color: 'var(--color-highlight)',
-                background: 'rgba(233,69,96,0.12)',
+                background: 'color-mix(in srgb, var(--color-highlight) 15%, transparent)',
                 padding: '1px 6px',
                 borderRadius: 6,
                 cursor: 'default',
@@ -245,7 +292,7 @@ export default function App() {
         <header
           className="hidden md:flex items-center justify-between px-6 py-4 sticky top-0 z-10"
           style={{
-            backgroundColor: 'rgba(22, 33, 62, 0.8)',
+            backgroundColor: 'var(--color-surface-blur)',
             borderBottom: '1px solid rgba(255,255,255,0.05)',
             backdropFilter: 'blur(8px)',
           }}
@@ -265,9 +312,12 @@ export default function App() {
         >
           <div className="flex items-center gap-2">
             <SyncBadge status={syncStatus} />
-            <span style={{ fontSize: 10, color: 'var(--color-highlight)', background: 'rgba(233,69,96,0.15)', padding: '1px 6px', borderRadius: 6 }}>
+            <button
+              onClick={() => setShowVersionInfo(true)}
+              style={{ fontSize: 10, color: 'var(--color-highlight)', background: 'rgba(233,69,96,0.15)', padding: '1px 6px', borderRadius: 6, border: 'none', cursor: 'pointer' }}
+            >
               {APP_VERSION}
-            </span>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -283,8 +333,9 @@ export default function App() {
                 ? <Loader size={12} className="animate-spin" />
                 : <CloudUpload size={12} />
               }
-              {syncStatus === 'syncing' ? '저장 중…' : T.save_cloud}
+              {syncStatus === 'syncing' ? T.syncing_label : T.save_cloud}
             </button>
+            <ThemeToggle />
             <LangToggle />
           </div>
         </div>
@@ -328,6 +379,21 @@ export default function App() {
         <Suspense fallback={null}>
           <PdfImport onClose={() => setShowPdfImport(false)} />
         </Suspense>
+      )}
+
+      {showVersionInfo && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6"
+          onClick={() => setShowVersionInfo(false)}>
+          <div className="bg-[var(--color-surface)] rounded-2xl p-5 w-full max-w-xs shadow-xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-highlight)' }}>{APP_VERSION}</span>
+              <button onClick={() => setShowVersionInfo(false)} className="text-[var(--color-muted)] hover:text-white text-lg leading-none">✕</button>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--color-muted)' }}>{BUILD_DATE}</p>
+            <p style={{ fontSize: 12, color: 'var(--color-text)', marginTop: 6, lineHeight: 1.5 }}>{BUILD_DESC}</p>
+          </div>
+        </div>
       )}
 
       {/* ── Mobile Bottom Bar ── */}

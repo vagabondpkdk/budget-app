@@ -1,11 +1,49 @@
 import type { Transaction } from '../types';
+// Worker content inlined at build time via ?raw — served as a same-origin <script> tag
+// in the main thread, which sets globalThis.pdfjsWorker so that PDFWorker._initialize()
+// detects it and skips Web Worker creation entirely (fake-worker / main-thread mode).
+// This sidesteps every CORS / MIME / CSP / service-worker issue with new Worker().
+import pdfWorkerContent from 'pdfjs-dist/build/pdf.worker.min.js?raw';
+
+let _workerBlobUrl: string | null = null;
+let _workerPreloaded  = false;
+
+function getWorkerBlobUrl(): string {
+  if (!_workerBlobUrl) {
+    const blob = new Blob([pdfWorkerContent], { type: 'application/javascript' });
+    _workerBlobUrl = URL.createObjectURL(blob);
+  }
+  return _workerBlobUrl;
+}
+
+/**
+ * Run the PDF.js worker script in the main thread once.
+ * This sets  globalThis.pdfjsWorker  which pdfjs reads via its
+ * static getter PDFWorker._mainThreadWorkerMessageHandler.
+ * When that getter is non-null, _initialize() skips new Worker()
+ * and goes straight to the fake-worker (synchronous) path.
+ */
+async function ensureWorkerPreloaded(): Promise<void> {
+  if (_workerPreloaded) return;
+  await new Promise<void>((resolve) => {
+    const s = document.createElement('script');
+    s.src = getWorkerBlobUrl();
+    s.onload  = () => { _workerPreloaded = true; resolve(); };
+    s.onerror = () => resolve(); // silent — pdfjs will fall back to Web Worker attempt
+    document.head.appendChild(s);
+  });
+}
 
 // ── PDF text extraction via PDF.js ────────────────────────────────────────────
 
 export async function extractPdfText(file: File): Promise<string> {
-  // pdfjs-dist v3 — use the minified worker from /public
+  // Pre-load worker in main thread → globalThis.pdfjsWorker is set
+  // → pdfjs skips Web Worker, uses fake-worker (main-thread) mode automatically
+  await ensureWorkerPreloaded();
+
   const pdfjsLib = await import('pdfjs-dist');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+  // Set workerSrc as a safety net (used only if preload somehow failed)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = getWorkerBlobUrl();
 
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
@@ -63,15 +101,17 @@ export interface ParsedTransaction {
   date: string;
   note: string;
   amount: number;
-  type: 'expense' | 'income' | 'cashback';
+  type: 'expense' | 'income' | 'cashback' | 'refund';
   bank: string;
 }
 
 /** Try to detect which bank this statement is from */
 export function detectBank(text: string): string {
   const t = text.toLowerCase();
-  if (t.includes('chase') || t.includes('sapphire') || t.includes('freedom')) return 'Chase';
+  // NOTE: use \bchase\b word-boundary so "purchase" doesn't false-match
+  if (/\bchase\b/.test(t) || t.includes('sapphire') || /\bfreedom\b/.test(t)) return 'Chase';
   if (t.includes('american express') || t.includes('amex')) return 'AMEX';
+  // Apple Card check BEFORE generic "apple" to avoid misdetection
   if (t.includes('apple card') || t.includes('goldman sachs')) return 'Apple Card';
   if (t.includes('citibank') || t.includes('citi ')) return 'Citi';
   if (t.includes('bank of america') || t.includes('boa ')) return 'BOA';
@@ -195,7 +235,7 @@ function parseChase(lines: string[]): ParsedTransaction[] {
     results.push({
       date, note: desc.trim(),
       amount: Math.abs(amount),
-      type: amount < 0 ? 'income' : 'expense',
+      type: amount < 0 ? 'refund' : 'expense',
       bank: 'Chase',
     });
   }
@@ -229,7 +269,7 @@ function parseAMEX(lines: string[]): ParsedTransaction[] {
       const date = parseDate(m[1], defaultYear);
       const amount = parseAmount(m[3]);
       if (date && amount !== null && amount !== 0) {
-        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'AMEX' });
+        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'AMEX' });
       }
       continue;
     }
@@ -242,7 +282,7 @@ function parseAMEX(lines: string[]): ParsedTransaction[] {
       const date = parseDate(m[1] + '/' + yr, defaultYear);
       const amount = parseAmount(m[3]);
       if (date && amount !== null && amount !== 0) {
-        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'AMEX' });
+        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'AMEX' });
       }
     }
   }
@@ -250,35 +290,79 @@ function parseAMEX(lines: string[]): ParsedTransaction[] {
 }
 
 // ── Apple Card ───────────────────────────────────────────────────────────────
-// Format: "Month DD, YYYY  MERCHANT  CATEGORY  $AMOUNT"
-// or columns: Date | Description | Daily Cash | Amount
+// Modern format (MM/DD/YYYY columns):
+//   Date | Description | [Daily Cash %] [Daily Cash $] | Amount
+//   03/01/2026  STARBUCKS 123 MAIN ST …  2%  $0.12  $6.25
+//   03/15/2026  AMAZON.COM (RETURN)  -$12.00
+// Returns on their own line followed by "Daily Cash Adjustment -X% $Y" line.
+// Legacy format: "Jan 15, 2025  MERCHANT  $AMOUNT"
 
 function parseAppleCard(lines: string[]): ParsedTransaction[] {
   const defaultYear = new Date().getFullYear();
   const results: ParsedTransaction[] = [];
-  let inActivity = false;
+  let inTransactions = false;
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
 
-    if (/transactions|activity/i.test(line) && line.length < 50) {
-      inActivity = true; continue;
+    // ── Section tracking (highest priority) ─────────────────────────────────
+    // "Payments" or "Payments made by …" → leave transaction mode
+    if (/^Payments$/i.test(line) || /^Payments made by /i.test(line)) {
+      inTransactions = false; continue;
     }
-    if (!inActivity) inActivity = true; // Apple Card has no clear section header
+    // "Transactions" or "Transactions by …" → enter transaction mode
+    if (/^Transactions$/i.test(line) || /^Transactions by /i.test(line)) {
+      inTransactions = true; continue;
+    }
 
-    if (/^(Date|Description|Merchant|Amount|Daily Cash|Total)/i.test(line)) continue;
+    if (!inTransactions) continue;
 
-    // "Jan 15, 2025  STARBUCKS  Food & Drinks  $5.75"
-    // "January 15, 2025  STARBUCKS  $5.75"
-    const m = line.match(/^([A-Za-z]{3,9}\.?\s+\d{1,2},?\s*\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s*$/);
+    // ── Skip summary/header lines within transactions section ────────────────
+    if (/^(Date\b|Description|Daily Cash|Amount|Total|Page \d|Apple Card|Statement|If you have|Account\b|Interest\b|Legal\b|Billing\b)/i.test(line)) continue;
+    // Skip follow-on "Daily Cash Adjustment" lines (they trail return entries)
+    if (/^Daily Cash Adjustment/i.test(line)) continue;
+    // Skip bare dashes placeholder rows like "— — 0% $0.00 $0.00"
+    if (/^[—\-]+\s/.test(line)) continue;
+
+    // ── Format 1: MM/DD/YYYY  <description>  [X%  $daily]  [-]$amount ───────
+    let m = line.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s*$/);
+    if (m) {
+      const date = parseDate(m[1], defaultYear);
+      const amount = parseAmount(m[3]);
+      if (!date || amount === null || amount === 0) continue;
+
+      // Strip trailing Daily Cash columns "[-]X% [-]$Y.YY"
+      let desc = m[2]
+        .replace(/\s+[-]?\d+%\s+[-]?\$[\d,]+\.\d{2}\s*$/, '')
+        .replace(/\s*\(RETURN\)\s*$/i, '')
+        .trim();
+
+      // Skip pure Daily Cash Adjustment entries (no real merchant)
+      if (!desc || /^daily cash adjustment$/i.test(desc)) continue;
+
+      results.push({
+        date, note: desc,
+        amount: Math.abs(amount),
+        type: amount < 0 ? 'refund' : 'expense',
+        bank: 'Apple Card',
+      });
+      continue;
+    }
+
+    // ── Format 2: "Jan 15, 2025  MERCHANT  $AMOUNT" (legacy) ─────────────────
+    m = line.match(/^([A-Za-z]{3,9}\.?\s+\d{1,2},?\s*\d{4})\s+(.+?)\s+(-?\$[\d,]+\.\d{2})\s*$/);
     if (m) {
       const date = parseDate(m[1], defaultYear);
       const amount = parseAmount(m[3]);
       if (date && amount !== null && amount !== 0) {
-        // Strip trailing category word if present
-        const note = m[2].replace(/\s+(Food|Shopping|Travel|Entertainment|Health|Services|Other)\s*$/i, '').trim();
-        results.push({ date, note, amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'Apple Card' });
+        const note = m[2]
+          .replace(/\s+[-]?\d+%\s+[-]?\$[\d,]+\.\d{2}\s*$/, '')
+          .replace(/\s+(Food|Shopping|Travel|Entertainment|Health|Services|Other)\s*$/i, '')
+          .trim();
+        if (note && !/^daily cash adjustment$/i.test(note)) {
+          results.push({ date, note, amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'Apple Card' });
+        }
       }
     }
   }
@@ -311,7 +395,7 @@ function parseCiti(lines: string[]): ParsedTransaction[] {
       const date = `${yr}-${String(mo).padStart(2, '0')}-${m[1].split('/')[1]}`;
       const amount = parseAmount(m[3]);
       if (amount !== null && amount !== 0) {
-        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'Citi' });
+        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'Citi' });
       }
     }
   }
@@ -342,7 +426,7 @@ function parseBOA(lines: string[]): ParsedTransaction[] {
       const date = parseDate(m[1], defaultYear);
       const amount = parseAmount(m[3]);
       if (date && amount !== null && amount !== 0) {
-        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'BOA' });
+        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'BOA' });
       }
     }
   }
@@ -372,7 +456,7 @@ function parseDiscover(lines: string[]): ParsedTransaction[] {
       const date = parseDate(m[1], defaultYear);
       const amount = parseAmount(m[3]);
       if (date && amount !== null && amount !== 0) {
-        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank: 'Discover' });
+        results.push({ date, note: m[2].trim(), amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank: 'Discover' });
       }
     }
   }
@@ -400,7 +484,7 @@ function parseGeneric(lines: string[], bank: string): ParsedTransaction[] {
       if (desc.length < 2) continue;
       const amount = parseAmount(m[3]);
       if (amount === null || amount === 0) continue;
-      results.push({ date, note: desc, amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank });
+      results.push({ date, note: desc, amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank });
       break;
     }
   }
@@ -419,7 +503,7 @@ function parseGeneric(lines: string[], bank: string): ParsedTransaction[] {
       if (!date || !amount || amount === 0) continue;
       const desc = tokens.slice(1, -1).join(' ').trim();
       if (desc.length < 2) continue;
-      results.push({ date, note: desc, amount: Math.abs(amount), type: amount < 0 ? 'income' : 'expense', bank });
+      results.push({ date, note: desc, amount: Math.abs(amount), type: amount < 0 ? 'refund' : 'expense', bank });
     }
   }
 

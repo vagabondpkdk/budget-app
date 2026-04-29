@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useStore } from '../../store/useStore';
 import { formatCurrency, getMonthTransactions, calcMonthSummary, getCategoryIcon, calcNetWorth } from '../../utils';
 import {
@@ -10,8 +10,14 @@ import { TRANSLATIONS, tCat } from '../../lib/i18n';
 import type { Transaction } from '../../types';
 import { TransactionList } from '../shared/TransactionList';
 import { TransactionForm } from '../TransactionForm/TransactionForm';
+import { MonthPicker } from '../shared/MonthPicker';
 
 type Period = 'weekly' | 'monthly' | 'yearly';
+type DetailModal =
+  | { type: 'day'; date: string }
+  | { type: 'month'; month: number }
+  | { type: 'month-user'; month: number }
+  | { type: 'annual-summary'; kind: 'income' | 'expense' | 'saving' };
 
 const COLORS = ['#E94560', '#74B9FF', '#00B894', '#FDCB6E', '#A29BFE', '#FD79A8', '#55EFC4', '#FF7675'];
 
@@ -22,6 +28,7 @@ export function Analytics() {
   const [period, setPeriod] = useState<Period>('monthly');
   const [filterCat, setFilterCat] = useState<string | null>(null);
   const [editingT, setEditingT] = useState<Transaction | null>(null);
+  const [detailModal, setDetailModal] = useState<DetailModal | null>(null);
 
   const months = T.months_ko;
 
@@ -170,8 +177,131 @@ export function Analytics() {
     return null;
   };
 
+  // ── Detail modal content ──
+  let detailTitle = '';
+  let detailBody: ReactNode = null;
+
+  if (detailModal) {
+    const dm = detailModal; // stable const for TS narrowing inside branches
+    if (dm.type === 'day') {
+      const d = new Date(dm.date + 'T12:00:00');
+      detailTitle = lang === 'ko'
+        ? `${d.getMonth() + 1}월 ${d.getDate()}일`
+        : format(d, 'MMM d, yyyy');
+      const dayTxns = transactions.filter(t => t.date === dm.date);
+      const total = dayTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+      detailBody = (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-[var(--color-muted)]">{T.total_label}</span>
+            <span className="text-sm font-mono font-bold text-[var(--color-highlight)]">{formatCurrency(total)}</span>
+          </div>
+          <TransactionList transactions={dayTxns} showDate={false}
+            onEdit={t => { setDetailModal(null); setEditingT(t); }}
+            onDelete={id => useStore.getState().deleteTransaction(id)} />
+        </>
+      );
+    } else if (dm.type === 'month' || dm.type === 'month-user') {
+      const mTxns = getMonthTransactions(transactions, currentYear, dm.month);
+      const { totalIncome, totalExpenses, totalRefunds, totalSaving } = calcMonthSummary(mTxns);
+      detailTitle = lang === 'ko'
+        ? `${currentYear}년 ${dm.month}월`
+        : `${months[dm.month - 1]} ${currentYear}`;
+      detailBody = (
+        <>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
+              <p className="text-xs text-[var(--color-muted)]">{T.income}</p>
+              <p className="text-sm font-mono font-bold text-[var(--color-success)]">{formatCurrency(totalIncome)}</p>
+            </div>
+            <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
+              <p className="text-xs text-[var(--color-muted)]">{T.expense}</p>
+              <p className="text-sm font-mono font-bold text-[var(--color-highlight)]">{formatCurrency(totalExpenses)}</p>
+            </div>
+            {totalRefunds > 0 && (
+              <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
+                <p className="text-xs text-[var(--color-muted)]">{T.t_refund}</p>
+                <p className="text-sm font-mono font-bold text-[var(--color-warning)]">{formatCurrency(totalRefunds)}</p>
+              </div>
+            )}
+            <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
+              <p className="text-xs text-[var(--color-muted)]">{T.saving}</p>
+              <p className={`text-sm font-mono font-bold ${totalSaving >= 0 ? 'text-[var(--color-info)]' : 'text-[var(--color-highlight)]'}`}>
+                {formatCurrency(totalSaving)}
+              </p>
+            </div>
+            {dm.type === 'month-user' && USERS.map(u => {
+              const amt = mTxns.filter(t => t.user === u && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+              if (!amt) return null;
+              return (
+                <div key={u} className="rounded-xl p-2.5"
+                  style={{ backgroundColor: USER_COLORS[u] + '22', border: `1px solid ${USER_COLORS[u]}44` }}>
+                  <p className="text-xs font-medium" style={{ color: USER_COLORS[u] }}>{u}</p>
+                  <p className="text-sm font-mono font-bold text-[var(--color-text)]">{formatCurrency(amt)}</p>
+                </div>
+              );
+            })}
+          </div>
+          <TransactionList transactions={mTxns.filter(t => t.amount > 0)} showDate
+            onEdit={t => { setDetailModal(null); setEditingT(t); }}
+            onDelete={id => useStore.getState().deleteTransaction(id)} />
+        </>
+      );
+    } else if (dm.type === 'annual-summary') {
+      const kindColor =
+        dm.kind === 'income'  ? 'var(--color-success)' :
+        dm.kind === 'expense' ? 'var(--color-highlight)' : 'var(--color-info)';
+      const kindLabel =
+        dm.kind === 'income'  ? T.an_annual_income :
+        dm.kind === 'expense' ? T.an_annual_expense : T.an_annual_saving;
+      const dataKey =
+        dm.kind === 'income'  ? 'totalIncome' :
+        dm.kind === 'expense' ? 'totalExpenses' : 'totalSaving';
+      const total = monthlyData.reduce((s, m) => s + (m as any)[dataKey], 0);
+      detailTitle = `${currentYear} ${kindLabel}`;
+      detailBody = (
+        <>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <span className="text-xs text-[var(--color-muted)]">
+              {lang === 'ko' ? '연간 합계' : 'Annual Total'}
+            </span>
+            <span className="text-base font-mono font-bold" style={{ color: kindColor }}>
+              {formatCurrency(Math.abs(total))}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {monthlyData.map((m, i) => {
+              const value = (m as any)[dataKey] as number;
+              const absTotal = Math.abs(total);
+              const pct = absTotal > 0 ? Math.abs(value) / absTotal * 100 : 0;
+              return (
+                <button key={i}
+                  onClick={() => setDetailModal({ type: 'month', month: i + 1 })}
+                  className="w-full flex items-center gap-3 hover:bg-white/5 rounded-lg px-2 py-1.5 transition-colors">
+                  <span className="text-xs text-[var(--color-muted)] w-8 text-right">{m.month}</span>
+                  <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, backgroundColor: kindColor }} />
+                  </div>
+                  <span className="text-xs font-mono w-20 text-right" style={{ color: kindColor }}>
+                    {Math.abs(value) > 0 ? formatCurrency(Math.abs(value)) : '—'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-center text-[var(--color-muted)] mt-3 opacity-60">
+            {lang === 'ko' ? '월 클릭 시 상세 내역' : 'Tap month for transactions'}
+          </p>
+        </>
+      );
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <MonthPicker />
+
       {/* Period Toggle */}
       <div className="flex gap-1 bg-[var(--color-surface)] rounded-xl p-1">
         {(['weekly', 'monthly', 'yearly'] as Period[]).map(p => (
@@ -204,13 +334,18 @@ export function Analytics() {
           </div>
 
           <div className="bg-[var(--color-surface)] rounded-2xl p-4">
-            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.an_daily_this_week}</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-1">{T.an_daily_this_week}</h3>
+            <p className="text-xs text-[var(--color-muted)] mb-3 opacity-60">
+              {lang === 'ko' ? '막대 클릭 시 상세 내역' : 'Tap bar for details'}
+            </p>
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={weeklyData} barSize={28}>
                 <XAxis dataKey="day" tick={{ fill: 'var(--color-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="amount" name={T.an_expense_label} radius={[4, 4, 0, 0]}>
+                <Bar dataKey="amount" name={T.an_expense_label} radius={[4, 4, 0, 0]}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(data: any) => data?.date && setDetailModal({ type: 'day', date: data.date })}>
                   {weeklyData.map((entry, i) => (
                     <Cell key={i} fill={entry.date === format(new Date(), 'yyyy-MM-dd') ? 'var(--color-highlight)' : 'var(--color-accent)'} />
                   ))}
@@ -337,34 +472,40 @@ export function Analytics() {
       {period === 'yearly' && (
         <>
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: T.an_annual_income, value: monthlyData.reduce((s, m) => s + m.totalIncome, 0), color: 'var(--color-success)' },
-              { label: T.an_annual_expense, value: monthlyData.reduce((s, m) => s + m.totalExpenses, 0), color: 'var(--color-highlight)' },
-              { label: T.an_annual_saving, value: monthlyData.reduce((s, m) => s + m.totalSaving, 0), color: 'var(--color-info)' },
-            ].map(item => (
-              <div key={item.label} className="bg-[var(--color-surface)] rounded-2xl p-3">
+            {([
+              { label: T.an_annual_income,  value: monthlyData.reduce((s, m) => s + m.totalIncome, 0),   color: 'var(--color-success)',   kind: 'income'  as const },
+              { label: T.an_annual_expense, value: monthlyData.reduce((s, m) => s + m.totalExpenses, 0), color: 'var(--color-highlight)', kind: 'expense' as const },
+              { label: T.an_annual_saving,  value: monthlyData.reduce((s, m) => s + m.totalSaving, 0),   color: 'var(--color-info)',      kind: 'saving'  as const },
+            ]).map(item => (
+              <button key={item.label}
+                onClick={() => setDetailModal({ type: 'annual-summary', kind: item.kind })}
+                className="bg-[var(--color-surface)] rounded-2xl p-3 text-left hover:bg-white/5 transition-colors">
                 <p className="text-xs text-[var(--color-muted)]">{item.label}</p>
                 <p className="text-sm font-mono font-bold" style={{ color: item.color }}>
                   {formatCurrency(Math.abs(item.value))}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
 
           <div className="bg-[var(--color-surface)] rounded-2xl p-4">
-            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.an_heatmap}</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-1">{T.an_heatmap}</h3>
+            <p className="text-xs text-[var(--color-muted)] mb-3 opacity-60">
+              {lang === 'ko' ? '월 클릭 시 상세 내역' : 'Tap month for details'}
+            </p>
             <div className="grid grid-cols-6 gap-2">
               {monthlyData.map((m, i) => {
                 const max = Math.max(...monthlyData.map(d => d.totalExpenses), 1);
                 const intensity = m.totalExpenses / max;
                 return (
-                  <div key={i} className="text-center">
-                    <div className="h-10 rounded-lg mb-1 flex items-center justify-center text-xs font-mono text-white"
+                  <button key={i} onClick={() => setDetailModal({ type: 'month', month: i + 1 })}
+                    className="text-center w-full">
+                    <div className="h-10 rounded-lg mb-1 flex items-center justify-center text-xs font-mono text-white hover:opacity-75 transition-opacity"
                       style={{ backgroundColor: `rgba(233, 69, 96, ${intensity * 0.9 + 0.1})` }}>
                       {m.totalExpenses > 0 ? `$${(m.totalExpenses / 1000).toFixed(1)}k` : '—'}
                     </div>
                     <span className="text-xs text-[var(--color-muted)]">{m.month}</span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -372,9 +513,17 @@ export function Analytics() {
 
           {/* ── Member breakdown by month (yearly) ── */}
           <div className="bg-[var(--color-surface)] rounded-2xl p-4">
-            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.an_user_year}</h3>
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-1">{T.an_user_year}</h3>
+            <p className="text-xs text-[var(--color-muted)] mb-3 opacity-60">
+              {lang === 'ko' ? '막대 클릭 시 월별 상세' : 'Tap bar for monthly detail'}
+            </p>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={userYearlyData} barSize={12}>
+              <BarChart data={userYearlyData} barSize={12} style={{ cursor: 'pointer' }}
+                onClick={(data: any) => {
+                  if (data?.activeTooltipIndex != null) {
+                    setDetailModal({ type: 'month-user', month: data.activeTooltipIndex + 1 });
+                  }
+                }}>
                 <XAxis dataKey="month" tick={{ fill: 'var(--color-muted)', fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
                 <Tooltip content={<CustomTooltip />} />
@@ -461,6 +610,21 @@ export function Analytics() {
             </div>
           )}
         </>
+      )}
+
+      {/* Detail modal (day / month / month-user) */}
+      {detailModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => setDetailModal(null)}>
+          <div className="w-full max-w-md max-h-[80vh] flex flex-col bg-[var(--color-surface)] rounded-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <h3 className="font-semibold text-[var(--color-text)] text-sm">{detailTitle}</h3>
+              <button onClick={() => setDetailModal(null)} className="text-[var(--color-muted)] text-sm px-2 py-1 rounded hover:bg-white/10">✕</button>
+            </div>
+            <div className="p-3 overflow-y-auto flex-1">{detailBody}</div>
+          </div>
+        </div>
       )}
 
       {/* Category detail modal */}

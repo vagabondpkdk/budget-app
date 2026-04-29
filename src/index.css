@@ -1,16 +1,75 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
-:root {
-  --color-primary: #1A1A2E;
-  --color-surface: #16213E;
-  --color-accent: #0F3460;
-  --color-highlight: #E94560;
-  --color-success: #00B894;
-  --color-warning: #FDCB6E;
-  --color-info: #74B9FF;
-  --color-text: #F0F0F0;
-  --color-muted: #A0A0B0;
+/* ── Navy (original) ──────────────────────────────── */
+:root,
+[data-theme="navy"] {
+  --color-primary:      #1A1A2E;
+  --color-surface:      #16213E;
+  --color-accent:       #0F3460;
+  --color-highlight:    #E94560;
+  --color-success:      #00B894;
+  --color-warning:      #FDCB6E;
+  --color-info:         #74B9FF;
+  --color-text:         #F0F0F0;
+  --color-muted:        #A0A0B0;
+  --color-surface-blur: rgba(22, 33, 62, 0.85);
+}
+
+/* ── Obsidian (near-black + violet) ───────────────── */
+[data-theme="obsidian"] {
+  --color-primary:      #0A0A0F;
+  --color-surface:      #13131A;
+  --color-accent:       #1D1B35;
+  --color-highlight:    #7C6FCD;
+  --color-success:      #30C48D;
+  --color-warning:      #F0B429;
+  --color-info:         #5B9BD5;
+  --color-text:         #E8E8F0;
+  --color-muted:        #8A8AA0;
+  --color-surface-blur: rgba(19, 19, 26, 0.85);
+}
+
+/* ── Zinc (warm dark + amber) ─────────────────────── */
+[data-theme="zinc"] {
+  --color-primary:      #09090B;
+  --color-surface:      #18181B;
+  --color-accent:       #27272A;
+  --color-highlight:    #F59E0B;
+  --color-success:      #22C55E;
+  --color-warning:      #EAB308;
+  --color-info:         #38BDF8;
+  --color-text:         #FAFAFA;
+  --color-muted:        #A1A1AA;
+  --color-surface-blur: rgba(24, 24, 27, 0.85);
+}
+
+/* ── Jade (dark green + emerald) ──────────────────── */
+[data-theme="jade"] {
+  --color-primary:      #0A0F0E;
+  --color-surface:      #111916;
+  --color-accent:       #1A2B24;
+  --color-highlight:    #10B981;
+  --color-success:      #34D399;
+  --color-warning:      #FBBF24;
+  --color-info:         #38BDF8;
+  --color-text:         #F0F8F5;
+  --color-muted:        #8AADA0;
+  --color-surface-blur: rgba(17, 25, 22, 0.85);
+}
+
+/* ── Slate (deep blue-slate + sky) ────────────────── */
+[data-theme="slate"] {
+  --color-primary:      #020617;
+  --color-surface:      #0F172A;
+  --color-accent:       #1E293B;
+  --color-highlight:    #38BDF8;
+  --color-success:      #10B981;
+  --color-warning:      #F59E0B;
+  --color-info:         #818CF8;
+  --color-text:         #F1F5F9;
+  --color-muted:        #94A3B8;
+  --color-surface-blur: rgba(15, 23, 42, 0.85);
 }
 
 * {

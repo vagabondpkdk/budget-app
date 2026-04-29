@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import type { Card } from '../../types';
-import { formatCurrency, getMonthTransactions } from '../../utils';
-import { Plus, Edit2, Power, GripVertical } from 'lucide-react';
+import type { Card, Transaction } from '../../types';
+import { formatCurrency, getMonthTransactions, getCategoryIcon } from '../../utils';
+import { Plus, Edit2, Power, GripVertical, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { CardForm } from './CardForm';
-import { TRANSLATIONS } from '../../lib/i18n';
+import { TransactionList } from '../shared/TransactionList';
+import { TransactionForm } from '../TransactionForm/TransactionForm';
+import { MonthPicker } from '../shared/MonthPicker';
+import { TRANSLATIONS, tCat } from '../../lib/i18n';
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -16,11 +19,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 function SortableCard({
-  card, spend, maxSpend, warning, onEdit, onToggle, lang,
+  card, spend, maxSpend, warning, onEdit, onToggle, onSelect, lang,
 }: {
   card: Card; spend: number; maxSpend: number;
   warning: 'overdue' | 'soon' | 'ok' | null;
-  onEdit: () => void; onToggle: () => void; lang: 'ko' | 'en';
+  onEdit: () => void; onToggle: () => void; onSelect: () => void; lang: 'ko' | 'en';
 }) {
   const T = TRANSLATIONS[lang];
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
@@ -68,16 +71,23 @@ function SortableCard({
             </button>
           </div>
         </div>
-        <div className="flex items-end justify-between">
+        {/* Clickable spend area */}
+        <button
+          onClick={onSelect}
+          className="w-full flex items-end justify-between hover:bg-white/10 rounded-xl p-1 -m-1 transition-colors"
+        >
           <div>
             <p className="text-xs text-white/70 mb-0.5">{T.this_month_usage}</p>
             <p className="font-mono font-bold text-white text-lg">{formatCurrency(spend)}</p>
           </div>
           <div className="text-right">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              card.owner === 'Kyle' ? 'bg-blue-500/30 text-blue-200' :
-              card.owner === 'Ella' ? 'bg-pink-500/30 text-pink-200' : 'bg-white/20 text-white/80'
-            }`}>{card.owner}</span>
+            <div className="flex items-center gap-1 justify-end">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                card.owner === 'Kyle' ? 'bg-blue-500/30 text-blue-200' :
+                card.owner === 'Ella' ? 'bg-pink-500/30 text-pink-200' : 'bg-white/20 text-white/80'
+              }`}>{card.owner}</span>
+              <ChevronRight size={12} className="text-white/40" />
+            </div>
             {card.payDueDay && (
               <p className={`text-xs mt-1 ${
                 warning === 'soon' ? 'text-yellow-300 font-bold' :
@@ -88,7 +98,7 @@ function SortableCard({
               </p>
             )}
           </div>
-        </div>
+        </button>
         {spend > 0 && (
           <div className="mt-3">
             <div className="h-1 bg-white/20 rounded-full">
@@ -107,6 +117,8 @@ export function CardManager() {
   const T = TRANSLATIONS[lang];
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [addingCard, setAddingCard] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [editingT, setEditingT] = useState<Transaction | null>(null);
 
   const monthTxns = useMemo(
     () => getMonthTransactions(transactions, currentYear, currentMonth),
@@ -123,7 +135,6 @@ export function CardManager() {
 
   const maxSpend = Math.max(...Object.values(cardSpend), 1);
   const today = new Date().getDate();
-  // Sort active cards by this month's spend (highest first)
   const activeCards = useMemo(() =>
     cards
       .filter(c => c.isActive)
@@ -155,6 +166,24 @@ export function CardManager() {
     }
   }
 
+  // Card detail data
+  const selectedCard = selectedCardId ? cards.find(c => c.id === selectedCardId) : null;
+  const selectedCardTxns = useMemo(() => {
+    if (!selectedCardId) return [];
+    return monthTxns.filter(t => t.cardId === selectedCardId);
+  }, [selectedCardId, monthTxns]);
+
+  const selectedCardTotal = selectedCardTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+
+  const selectedCardCategoryBreakdown = useMemo(() => {
+    if (!selectedCardId) return [];
+    const map: Record<string, number> = {};
+    selectedCardTxns.filter(t => t.amount > 0).forEach(t => {
+      map[t.category] = (map[t.category] || 0) + t.amount;
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [selectedCardId, selectedCardTxns]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -170,6 +199,8 @@ export function CardManager() {
         </button>
       </div>
 
+      <MonthPicker />
+
       {/* Sortable Cards */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={activeCards.map(c => c.id)} strategy={rectSortingStrategy}>
@@ -183,6 +214,7 @@ export function CardManager() {
                 warning={dueDayWarning(card.payDueDay)}
                 onEdit={() => setEditingCard(card)}
                 onToggle={() => useStore.getState().toggleCardActive(card.id)}
+                onSelect={() => setSelectedCardId(card.id)}
                 lang={lang}
               />
             ))}
@@ -196,9 +228,10 @@ export function CardManager() {
           <h3 className="text-sm font-semibold text-[var(--color-muted)] mb-3">{T.card_monthly}</h3>
           <div className="space-y-2">
             {cards.filter(c => cardSpend[c.id]).sort((a, b) => (cardSpend[b.id] || 0) - (cardSpend[a.id] || 0)).map(card => (
-              <div key={card.id} className="flex items-center gap-3">
+              <button key={card.id} onClick={() => setSelectedCardId(card.id)}
+                className="w-full flex items-center gap-3 hover:bg-white/5 rounded-lg px-1 py-0.5 transition-colors">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: card.color }} />
-                <span className="text-xs text-[var(--color-muted)] w-32 truncate">{card.name}</span>
+                <span className="text-xs text-[var(--color-muted)] w-32 truncate text-left">{card.name}</span>
                 <div className="flex-1 h-2 bg-white/10 rounded-full">
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${((cardSpend[card.id] || 0) / maxSpend) * 100}%`, backgroundColor: card.color }} />
@@ -206,7 +239,7 @@ export function CardManager() {
                 <span className="text-xs font-mono text-[var(--color-text)] w-20 text-right">
                   {formatCurrency(cardSpend[card.id] || 0)}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -257,10 +290,76 @@ export function CardManager() {
         </div>
       )}
 
+      {/* Card Detail Modal */}
+      {selectedCard && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => setSelectedCardId(null)}>
+          <div className="w-full max-w-md max-h-[85vh] flex flex-col bg-[var(--color-surface)] rounded-2xl"
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedCard.color }} />
+                <div>
+                  <h3 className="font-semibold text-[var(--color-text)] text-sm">{selectedCard.name}</h3>
+                  <p className="text-xs text-[var(--color-muted)]">{selectedCard.bank} · {selectedCard.owner}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCardId(null)} className="text-[var(--color-muted)] text-sm px-2 py-1 rounded hover:bg-white/10">✕</button>
+            </div>
+
+            {/* Summary */}
+            <div className="px-4 py-3 border-b border-white/10 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[var(--color-muted)]">
+                  {lang === 'ko' ? `${currentYear}년 ${currentMonth}월 총 사용` : `${T.months_ko[currentMonth - 1]} ${currentYear} Total`}
+                </span>
+                <span className="text-base font-mono font-bold text-[var(--color-highlight)]">{formatCurrency(selectedCardTotal)}</span>
+              </div>
+              {selectedCardCategoryBreakdown.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {selectedCardCategoryBreakdown.slice(0, 5).map(([cat, amt]) => (
+                    <div key={cat} className="flex items-center gap-1 bg-white/5 rounded-full px-2 py-0.5">
+                      <span className="text-xs">{getCategoryIcon(cat as any)}</span>
+                      <span className="text-xs text-[var(--color-muted)]">{tCat(lang, cat)}</span>
+                      <span className="text-xs font-mono text-[var(--color-text)]">{formatCurrency(amt)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Transaction list */}
+            <div className="overflow-y-auto flex-1 p-3">
+              {selectedCardTxns.length > 0 ? (
+                <TransactionList
+                  transactions={selectedCardTxns}
+                  showDate
+                  onEdit={t => { setSelectedCardId(null); setEditingT(t); }}
+                  onDelete={id => useStore.getState().deleteTransaction(id)}
+                />
+              ) : (
+                <p className="text-center text-sm text-[var(--color-muted)] py-8">
+                  {lang === 'ko' ? '이번 달 거래 없음' : 'No transactions this month'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {(addingCard || editingCard) && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4">
           <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <CardForm initialCard={editingCard || undefined} onClose={() => { setAddingCard(false); setEditingCard(null); }} />
+          </div>
+        </div>
+      )}
+
+      {editingT && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <TransactionForm initialTransaction={editingT} onClose={() => setEditingT(null)} />
           </div>
         </div>
       )}
