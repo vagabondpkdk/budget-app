@@ -151,7 +151,8 @@ export function Dashboard() {
         <ResponsiveContainer width="100%" height={130}>
           <BarChart data={weeklyData} barSize={36}
             onClick={(data) => {
-              if (data?.activeTooltipIndex != null) setSelectedWeek(weeklyData[data.activeTooltipIndex]);
+              const idx = data?.activeTooltipIndex;
+              if (typeof idx === 'number') setSelectedWeek(weeklyData[idx]);
             }}
             style={{ cursor: 'pointer' }}
           >
