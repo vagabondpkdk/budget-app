@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Kyle & Ella Budget',
+        name: 'Budget App Demo',
         short_name: 'Budget',
-        description: 'Kyle & Ella 가계부',
+        description: 'Personal Budget Tracker – Demo',
         theme_color: '#1A1A2E',
         background_color: '#1A1A2E',
         display: 'standalone',

@@ -165,7 +165,7 @@ export default function App() {
             </div>
             <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--color-text)' }}>Budget</h1>
           </div>
-          <p className="text-xs mb-2 pl-0.5" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>Kyle & Ella</p>
+          <p className="text-xs mb-2 pl-0.5" style={{ color: 'var(--color-muted)', opacity: 0.6 }}>Demo</p>
           <div className="flex items-center justify-between">
             <SyncBadge status={syncStatus} />
             <LangToggle />
