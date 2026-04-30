@@ -26,7 +26,7 @@ export function TransactionList({ transactions, showDate = false, onEdit, onDele
   }
 
   return (
-    <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+    <div className="divide-y" style={{ borderColor: 'var(--color-divider)' }}>
       {transactions.map(t => {
         const refundedAmt = refundedMap?.get(t.id);
         const isRefunded = !!refundedAmt && t.amount > 0;

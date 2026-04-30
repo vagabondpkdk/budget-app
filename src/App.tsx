@@ -56,38 +56,57 @@ function LangToggle() {
   );
 }
 
-const THEMES: { id: string; color: string; label: string }[] = [
-  { id: 'navy',     color: '#E94560', label: 'Navy' },
-  { id: 'obsidian', color: '#7C6FCD', label: 'Obsidian' },
-  { id: 'zinc',     color: '#F59E0B', label: 'Zinc' },
-  { id: 'jade',     color: '#10B981', label: 'Jade' },
-  { id: 'slate',    color: '#38BDF8', label: 'Slate' },
+const THEMES: { id: string; bg: string; dot: string; label: string; icon: string; desc: string }[] = [
+  { id: 'navy',     bg: '#1A1A2E', dot: '#E94560', label: 'Navy',     icon: '🌊', desc: 'Dark Navy' },
+  { id: 'air',      bg: '#FFFFFF', dot: '#6366F1', label: 'Air',      icon: '☀️', desc: 'Clean Light' },
+  { id: 'midnight', bg: '#06060A', dot: '#A855F7', label: 'Midnight', icon: '🌙', desc: 'Pure Black' },
+  { id: 'forest',   bg: '#061410', dot: '#10B981', label: 'Forest',   icon: '🌿', desc: 'Dark Green' },
+  { id: 'ember',    bg: '#110804', dot: '#F97316', label: 'Ember',    icon: '🔥', desc: 'Warm Dark' },
 ];
 
 function ThemeToggle() {
   const { theme, setTheme } = useStore();
   return (
-    <div className="flex gap-1.5 items-center">
-      {THEMES.map(t => (
-        <button
-          key={t.id}
-          title={t.label}
-          onClick={() => setTheme(t.id)}
-          style={{
-            width: 15,
-            height: 15,
-            borderRadius: '50%',
-            background: t.color,
-            border: `2px solid ${theme === t.id ? 'rgba(255,255,255,0.9)' : 'transparent'}`,
-            boxShadow: theme === t.id ? `0 0 0 1.5px ${t.color}80` : 'none',
-            padding: 0,
-            cursor: 'pointer',
-            transition: 'transform 0.15s, box-shadow 0.15s',
-            transform: theme === t.id ? 'scale(1.25)' : 'scale(1)',
-            flexShrink: 0,
-          }}
-        />
-      ))}
+    <div className="flex gap-1 items-center">
+      {THEMES.map(t => {
+        const isActive = theme === t.id;
+        return (
+          <button
+            key={t.id}
+            title={`${t.icon} ${t.label} — ${t.desc}`}
+            onClick={() => setTheme(t.id)}
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: t.bg,
+              border: `2.5px solid ${isActive ? t.dot : 'transparent'}`,
+              boxShadow: isActive
+                ? `0 0 0 1.5px ${t.dot}60, 0 0 8px ${t.dot}40`
+                : `inset 0 0 0 1px rgba(128,128,128,0.2)`,
+              padding: 0,
+              cursor: 'pointer',
+              transition: 'all 0.18s cubic-bezier(0.34,1.56,0.64,1)',
+              transform: isActive ? 'scale(1.3)' : 'scale(1)',
+              flexShrink: 0,
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* inner dot to show accent color */}
+            <span style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: t.dot,
+                opacity: isActive ? 1 : 0.7,
+              }} />
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

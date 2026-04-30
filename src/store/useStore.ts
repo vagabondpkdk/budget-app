@@ -195,7 +195,7 @@ export const useStore = create<StoreState>((set, get) => {
   const { year: initYear, month: initMonth } = getInitialMonth();
 
   // Apply saved theme to DOM immediately (prevents flash)
-  const initialTheme = loadFromStorage(LS_THEME, 'obsidian') as string;
+  const initialTheme = loadFromStorage(LS_THEME, 'navy') as string;
   if (typeof document !== 'undefined') {
     document.documentElement.dataset.theme = initialTheme;
   }
