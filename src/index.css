@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 /* ╔══════════════════════════════════════════════════════════════╗
-   ║  THEME SYSTEM — 5 distinct visual identities                ║
+   ║  THEME SYSTEM — 3 distinct visual identities                ║
    ╚══════════════════════════════════════════════════════════════╝ */
 
 /* ── 1. NAVY (Standard · Dark Navy + Crimson) ─────────────────── */
@@ -26,20 +26,20 @@
   color-scheme: dark;
 }
 
-/* ── 2. AIR (Light · Clean + Indigo) ──────────────────────────── */
+/* ── 2. AIR (Light · Soft Gray + Indigo) ──────────────────────── */
 [data-theme="air"] {
-  --color-primary:      #EEF0F5;
+  --color-primary:      #F0F2F7;
   --color-surface:      #FFFFFF;
-  --color-accent:       #E4E8F0;
-  --color-highlight:    #6366F1;
-  --color-success:      #059669;
-  --color-warning:      #D97706;
-  --color-info:         #2563EB;
-  --color-text:         #111827;
-  --color-muted:        #6B7280;
-  --color-surface-blur: rgba(238, 240, 245, 0.92);
-  --color-divider:      rgba(0,0,0,0.07);
-  --color-card-border:  rgba(0,0,0,0.08);
+  --color-accent:       #E6E9F2;
+  --color-highlight:    #4F46E5;
+  --color-success:      #047857;
+  --color-warning:      #B45309;
+  --color-info:         #1D4ED8;
+  --color-text:         #0F172A;
+  --color-muted:        #475569;
+  --color-surface-blur: rgba(240, 242, 247, 0.94);
+  --color-divider:      rgba(0,0,0,0.08);
+  --color-card-border:  rgba(0,0,0,0.09);
   --color-input-bg:     rgba(0,0,0,0.05);
   --color-overlay-sm:   rgba(0,0,0,0.04);
   --color-overlay-md:   rgba(0,0,0,0.08);
@@ -66,51 +66,11 @@
   color-scheme: dark;
 }
 
-/* ── 4. FOREST (Dark Green + Emerald) ─────────────────────────── */
-[data-theme="forest"] {
-  --color-primary:      #061410;
-  --color-surface:      #0D2118;
-  --color-accent:       #143326;
-  --color-highlight:    #10B981;
-  --color-success:      #34D399;
-  --color-warning:      #FBBF24;
-  --color-info:         #6EE7B7;
-  --color-text:         #EDFFF7;
-  --color-muted:        #7AAF92;
-  --color-surface-blur: rgba(13, 33, 24, 0.9);
-  --color-divider:      rgba(16,185,129,0.12);
-  --color-card-border:  rgba(16,185,129,0.15);
-  --color-input-bg:     rgba(16,185,129,0.07);
-  --color-overlay-sm:   rgba(16,185,129,0.05);
-  --color-overlay-md:   rgba(16,185,129,0.1);
-  color-scheme: dark;
-}
-
-/* ── 5. EMBER (Warm Dark + Amber-Orange) ─────────────────────── */
-[data-theme="ember"] {
-  --color-primary:      #110804;
-  --color-surface:      #1E1008;
-  --color-accent:       #2D1A0E;
-  --color-highlight:    #F97316;
-  --color-success:      #86EFAC;
-  --color-warning:      #FCD34D;
-  --color-info:         #FB923C;
-  --color-text:         #FFF3E8;
-  --color-muted:        #A87B5A;
-  --color-surface-blur: rgba(30, 16, 8, 0.9);
-  --color-divider:      rgba(249,115,22,0.12);
-  --color-card-border:  rgba(249,115,22,0.15);
-  --color-input-bg:     rgba(249,115,22,0.07);
-  --color-overlay-sm:   rgba(249,115,22,0.05);
-  --color-overlay-md:   rgba(249,115,22,0.1);
-  color-scheme: dark;
-}
-
 /* ╔══════════════════════════════════════════════════════════════╗
    ║  PER-THEME VISUAL IDENTITY OVERRIDES                        ║
    ╚══════════════════════════════════════════════════════════════╝ */
 
-/* AIR — elevated card style with soft shadows */
+/* AIR — elevated card style */
 [data-theme="air"] .rounded-2xl {
   box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05) !important;
 }
@@ -118,61 +78,40 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.04) !important;
 }
 
-/* MIDNIGHT — subtle glow borders on cards */
+/* MIDNIGHT — glow borders */
 [data-theme="midnight"] .rounded-2xl {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.12), 0 4px 32px rgba(0,0,0,0.6) !important;
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.13), 0 4px 32px rgba(0,0,0,0.65) !important;
 }
 [data-theme="midnight"] .rounded-xl {
-  box-shadow: 0 0 0 1px rgba(168,85,247,0.08), 0 2px 16px rgba(0,0,0,0.4) !important;
-}
-
-/* FOREST — warm green glow */
-[data-theme="forest"] .rounded-2xl {
-  box-shadow: 0 0 0 1px rgba(16,185,129,0.12), 0 4px 24px rgba(0,0,0,0.5) !important;
-}
-
-/* EMBER — warm amber glow */
-[data-theme="ember"] .rounded-2xl {
-  box-shadow: 0 0 0 1px rgba(249,115,22,0.12), 0 4px 24px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 0 0 1px rgba(168,85,247,0.09), 0 2px 16px rgba(0,0,0,0.45) !important;
 }
 
 /* ── AIR: Tailwind white-opacity class overrides ────────────── */
-[data-theme="air"] .hover\:bg-white\/5:hover  { background-color: rgba(0,0,0,0.04) !important; }
-[data-theme="air"] .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.06) !important; }
-[data-theme="air"] .active\:bg-white\/10:active { background-color: rgba(0,0,0,0.06) !important; }
+[data-theme="air"] .hover\:bg-white\/5:hover     { background-color: rgba(0,0,0,0.04) !important; }
+[data-theme="air"] .hover\:bg-white\/10:hover    { background-color: rgba(0,0,0,0.06) !important; }
+[data-theme="air"] .active\:bg-white\/10:active  { background-color: rgba(0,0,0,0.06) !important; }
 [data-theme="air"] .bg-white\/10  { background-color: rgba(0,0,0,0.06) !important; }
 [data-theme="air"] .bg-white\/5   { background-color: rgba(0,0,0,0.03) !important; }
 [data-theme="air"] .border-white\/10 { border-color: rgba(0,0,0,0.1) !important; }
 [data-theme="air"] .border-white\/5  { border-color: rgba(0,0,0,0.06) !important; }
-[data-theme="air"] .divide-y > * + * { border-color: rgba(0,0,0,0.06) !important; }
-[data-theme="air"] .border-b { border-color: rgba(0,0,0,0.08) !important; }
+[data-theme="air"] .divide-y > * + * { border-color: rgba(0,0,0,0.07) !important; }
+[data-theme="air"] .border-b         { border-color: rgba(0,0,0,0.08) !important; }
+
+/* AIR: hardcoded light-on-dark color fixes */
+[data-theme="air"] .text-white         { color: var(--color-text) !important; }
+[data-theme="air"] .text-yellow-300    { color: #92400E !important; }
+[data-theme="air"] .text-green-400     { color: #065F46 !important; }
+[data-theme="air"] .text-red-400       { color: #991B1B !important; }
+[data-theme="air"] .text-pink-400      { color: #9D174D !important; }
 
 /* ── MIDNIGHT: colored overlay overrides ───────────────────── */
-[data-theme="midnight"] .hover\:bg-white\/5:hover  { background-color: rgba(168,85,247,0.06) !important; }
-[data-theme="midnight"] .hover\:bg-white\/10:hover { background-color: rgba(168,85,247,0.1) !important; }
-[data-theme="midnight"] .active\:bg-white\/10:active { background-color: rgba(168,85,247,0.1) !important; }
-[data-theme="midnight"] .bg-white\/10 { background-color: rgba(168,85,247,0.08) !important; }
-[data-theme="midnight"] .bg-white\/5  { background-color: rgba(168,85,247,0.05) !important; }
-[data-theme="midnight"] .border-white\/10 { border-color: rgba(168,85,247,0.15) !important; }
-[data-theme="midnight"] .border-b { border-color: rgba(168,85,247,0.1) !important; }
-
-/* ── FOREST: green overlay overrides ───────────────────────── */
-[data-theme="forest"] .hover\:bg-white\/5:hover  { background-color: rgba(16,185,129,0.05) !important; }
-[data-theme="forest"] .hover\:bg-white\/10:hover { background-color: rgba(16,185,129,0.09) !important; }
-[data-theme="forest"] .active\:bg-white\/10:active { background-color: rgba(16,185,129,0.09) !important; }
-[data-theme="forest"] .bg-white\/10 { background-color: rgba(16,185,129,0.08) !important; }
-[data-theme="forest"] .bg-white\/5  { background-color: rgba(16,185,129,0.04) !important; }
-[data-theme="forest"] .border-white\/10 { border-color: rgba(16,185,129,0.14) !important; }
-[data-theme="forest"] .border-b { border-color: rgba(16,185,129,0.09) !important; }
-
-/* ── EMBER: amber overlay overrides ────────────────────────── */
-[data-theme="ember"] .hover\:bg-white\/5:hover  { background-color: rgba(249,115,22,0.05) !important; }
-[data-theme="ember"] .hover\:bg-white\/10:hover { background-color: rgba(249,115,22,0.09) !important; }
-[data-theme="ember"] .active\:bg-white\/10:active { background-color: rgba(249,115,22,0.09) !important; }
-[data-theme="ember"] .bg-white\/10 { background-color: rgba(249,115,22,0.08) !important; }
-[data-theme="ember"] .bg-white\/5  { background-color: rgba(249,115,22,0.04) !important; }
-[data-theme="ember"] .border-white\/10 { border-color: rgba(249,115,22,0.14) !important; }
-[data-theme="ember"] .border-b { border-color: rgba(249,115,22,0.09) !important; }
+[data-theme="midnight"] .hover\:bg-white\/5:hover     { background-color: rgba(168,85,247,0.06) !important; }
+[data-theme="midnight"] .hover\:bg-white\/10:hover    { background-color: rgba(168,85,247,0.1) !important; }
+[data-theme="midnight"] .active\:bg-white\/10:active  { background-color: rgba(168,85,247,0.1) !important; }
+[data-theme="midnight"] .bg-white\/10  { background-color: rgba(168,85,247,0.08) !important; }
+[data-theme="midnight"] .bg-white\/5   { background-color: rgba(168,85,247,0.05) !important; }
+[data-theme="midnight"] .border-white\/10 { border-color: rgba(168,85,247,0.16) !important; }
+[data-theme="midnight"] .border-b         { border-color: rgba(168,85,247,0.1) !important; }
 
 /* ╔══════════════════════════════════════════════════════════════╗
    ║  BASE STYLES                                                 ║

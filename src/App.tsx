@@ -58,10 +58,8 @@ function LangToggle() {
 
 const THEMES: { id: string; bg: string; dot: string; label: string; icon: string; desc: string }[] = [
   { id: 'navy',     bg: '#1A1A2E', dot: '#E94560', label: 'Navy',     icon: '🌊', desc: 'Dark Navy' },
-  { id: 'air',      bg: '#FFFFFF', dot: '#6366F1', label: 'Air',      icon: '☀️', desc: 'Clean Light' },
+  { id: 'air',      bg: '#F0F2F7', dot: '#4F46E5', label: 'Air',      icon: '☀️', desc: 'Clean Light' },
   { id: 'midnight', bg: '#06060A', dot: '#A855F7', label: 'Midnight', icon: '🌙', desc: 'Pure Black' },
-  { id: 'forest',   bg: '#061410', dot: '#10B981', label: 'Forest',   icon: '🌿', desc: 'Dark Green' },
-  { id: 'ember',    bg: '#110804', dot: '#F97316', label: 'Ember',    icon: '🔥', desc: 'Warm Dark' },
 ];
 
 function ThemeToggle() {
