@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../../store/useStore';
-import { getMonthTransactions, calcMonthSummary, formatCurrency, getCategoryIcon, isRealIncome } from '../../utils';
+import { getMonthTransactions, calcMonthSummary, computeRefundLinks, formatCurrency, getCategoryIcon, isRealIncome } from '../../utils';
+import type { RefundLinkMap } from '../../utils';
 import { getDaysInMonth } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -36,9 +37,24 @@ export function Dashboard() {
     [transactions, currentYear, currentMonth]
   );
 
-  const { totalIncome, totalExpenses, totalRefunds, totalSaving } = useMemo(
-    () => calcMonthSummary(monthTxns),
-    [monthTxns]
+  // 전체 거래 기반 환급 링크 (cross-month 지원)
+  const allRefundLinks: RefundLinkMap = useMemo(
+    () => computeRefundLinks(transactions),
+    [transactions]
+  );
+
+  // 지출 거래에 표시할 상계 맵: expenseId → 상계된 금액
+  const refundedExpenseMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const [, { expenseId, refundAmount }] of allRefundLinks) {
+      map.set(expenseId, (map.get(expenseId) ?? 0) + refundAmount);
+    }
+    return map;
+  }, [allRefundLinks]);
+
+  const { totalIncome, totalExpenses, totalRefunds, totalLinkedRefunds, totalSaving } = useMemo(
+    () => calcMonthSummary(monthTxns, allRefundLinks),
+    [monthTxns, allRefundLinks]
   );
 
   const weeklyData = useMemo((): WeekEntry[] => {
@@ -96,12 +112,12 @@ export function Dashboard() {
     return [];
   }, [drillDown, monthTxns]);
 
-  const drillLabel = drillDown === 'income' ? T.income : drillDown === 'expense' ? T.expense : '환급';
+  const drillLabel = drillDown === 'income' ? T.income : drillDown === 'expense' ? T.expense : '환급 상계';
   const drillTotal = drillDown === 'income' ? totalIncome
     : drillDown === 'expense' ? totalExpenses
-    : totalRefunds;
+    : totalLinkedRefunds + totalRefunds;
 
-  // 저축률: (수입 + 환급) 대비 저축 비율. 둘 다 0이면 지출이 있을 경우 -100%
+  // 저축률: 수입 대비 저축 비율
   const effectiveIncome = totalIncome + totalRefunds;
   const displaySavingRate = effectiveIncome > 0
     ? Math.min(Math.max((totalSaving / effectiveIncome) * 100, -100), 100)
@@ -123,8 +139,11 @@ export function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3">
         <SummaryCard label={T.income}  value={totalIncome}   color="var(--color-success)"   onClick={() => setDrillDown('income')} />
-        <SummaryCard label={T.expense} value={totalExpenses} color="var(--color-highlight)" onClick={() => setDrillDown('expense')} />
-        <SummaryCard label="환급"      value={totalRefunds}  color="var(--color-warning)"   onClick={() => setDrillDown('refund')} />
+        <SummaryCard label={T.expense} value={totalExpenses} color="var(--color-highlight)" onClick={() => setDrillDown('expense')}
+          subtitle={totalLinkedRefunds > 0 ? `상계 후 순지출` : undefined} />
+        <SummaryCard label="상계됨" value={totalLinkedRefunds + totalRefunds} color="var(--color-warning)"
+          onClick={() => setDrillDown('refund')}
+          subtitle={totalLinkedRefunds > 0 ? `지출 ${totalLinkedRefunds > 0 ? '차감' : ''}` : undefined} />
         <SummaryCard label={T.saving}  value={totalSaving}   color={totalSaving >= 0 ? 'var(--color-info)' : 'var(--color-highlight)'} onClick={() => setDrillDown('saving')} />
       </div>
 
@@ -215,6 +234,7 @@ export function Dashboard() {
         <TransactionList transactions={recent} showDate compact
           onEdit={setEditingT}
           onDelete={id => useStore.getState().deleteTransaction(id)}
+          refundedMap={refundedExpenseMap}
         />
       </div>
 
@@ -268,6 +288,7 @@ export function Dashboard() {
                     showDate
                     onEdit={t => { setSelectedWeek(null); setEditingT(t); }}
                     onDelete={id => useStore.getState().deleteTransaction(id)}
+                    refundedMap={refundedExpenseMap}
                   />
               }
             </div>
@@ -304,6 +325,7 @@ export function Dashboard() {
                 : <TransactionList transactions={drillTxns} showDate
                     onEdit={t => { setDrillDown(null); setEditingT(t); }}
                     onDelete={id => useStore.getState().deleteTransaction(id)}
+                    refundedMap={refundedExpenseMap}
                   />
               }
             </div>
@@ -328,12 +350,20 @@ export function Dashboard() {
                   <span className="text-sm text-[var(--color-muted)]">수입</span>
                   <span className="font-mono text-sm text-[var(--color-success)]">+{formatCurrency(totalIncome)}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-sm text-[var(--color-muted)]">환급</span>
-                  <span className="font-mono text-sm text-[var(--color-warning)]">+{formatCurrency(totalRefunds)}</span>
-                </div>
+                {totalLinkedRefunds > 0 && (
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-sm text-[var(--color-muted)]">🔄 지출 상계</span>
+                    <span className="font-mono text-sm text-[var(--color-success)]">−{formatCurrency(totalLinkedRefunds)} <span className="opacity-50 text-xs">(지출서 차감)</span></span>
+                  </div>
+                )}
+                {totalRefunds > 0 && (
+                  <div className="flex justify-between items-center py-2 border-b border-white/5">
+                    <span className="text-sm text-[var(--color-muted)]">캐시백/기타 환급</span>
+                    <span className="font-mono text-sm text-[var(--color-warning)]">+{formatCurrency(totalRefunds)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-2 border-b border-white/10">
-                  <span className="text-sm text-[var(--color-muted)]">지출</span>
+                  <span className="text-sm text-[var(--color-muted)]">순 지출{totalLinkedRefunds > 0 ? ' (상계 후)' : ''}</span>
                   <span className="font-mono text-sm text-[var(--color-highlight)]">−{formatCurrency(totalExpenses)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2.5 bg-white/5 rounded-xl px-3">
@@ -353,7 +383,7 @@ export function Dashboard() {
                 {(['income','expense','refund'] as const).map(k => (
                   <button key={k} onClick={() => setDrillDown(k)}
                     className="py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 text-[var(--color-muted)] transition-colors">
-                    {k === 'income' ? '수입 내역' : k === 'expense' ? '지출 내역' : '환급 내역'}
+                    {k === 'income' ? '수입 내역' : k === 'expense' ? '지출 내역' : '상계 내역'}
                   </button>
                 ))}
               </div>
@@ -394,7 +424,7 @@ export function Dashboard() {
   );
 }
 
-function SummaryCard({ label, value, color, onClick }: { label: string; value: number; color: string; onClick?: () => void }) {
+function SummaryCard({ label, value, color, onClick, subtitle }: { label: string; value: number; color: string; onClick?: () => void; subtitle?: string }) {
   return (
     <button
       type="button"
@@ -405,8 +435,9 @@ function SummaryCard({ label, value, color, onClick }: { label: string; value: n
         border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
       }}
     >
-      <p className="text-xs font-medium mb-2" style={{ color: 'var(--color-muted)' }}>{label}</p>
+      <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-muted)' }}>{label}</p>
       <p className="text-base font-mono font-bold truncate" style={{ color }}>{formatCurrency(Math.abs(value))}</p>
+      {subtitle && <p className="text-[10px] mt-0.5 opacity-50" style={{ color: 'var(--color-muted)' }}>{subtitle}</p>}
     </button>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { useStore } from '../../store/useStore';
-import { formatCurrency, getMonthTransactions, calcMonthSummary, getCategoryIcon, calcNetWorth } from '../../utils';
+import { formatCurrency, getMonthTransactions, calcMonthSummary, computeRefundLinks, getCategoryIcon, calcNetWorth } from '../../utils';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid
@@ -32,15 +32,18 @@ export function Analytics() {
 
   const months = T.months_ko;
 
+  // 전체 환급 링크 (Analytics에서 공유)
+  const allRefundLinks = useMemo(() => computeRefundLinks(transactions), [transactions]);
+
   // ── Monthly data ──
   const monthlyData = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => {
       const m = i + 1;
       const txns = getMonthTransactions(transactions, currentYear, m);
-      const { totalIncome, totalExpenses, totalSaving, savingRate } = calcMonthSummary(txns);
+      const { totalIncome, totalExpenses, totalSaving, savingRate } = calcMonthSummary(txns, allRefundLinks);
       return { month: months[i], totalIncome, totalExpenses, totalSaving, savingRate };
     });
-  }, [transactions, currentYear, months]);
+  }, [transactions, currentYear, months, allRefundLinks]);
 
   // ── Weekly data ──
   const weeklyData = useMemo(() => {
@@ -203,7 +206,7 @@ export function Analytics() {
       );
     } else if (dm.type === 'month' || dm.type === 'month-user') {
       const mTxns = getMonthTransactions(transactions, currentYear, dm.month);
-      const { totalIncome, totalExpenses, totalRefunds, totalSaving } = calcMonthSummary(mTxns);
+      const { totalIncome, totalExpenses, totalRefunds, totalLinkedRefunds, totalSaving } = calcMonthSummary(mTxns, allRefundLinks);
       detailTitle = lang === 'ko'
         ? `${currentYear}년 ${dm.month}월`
         : `${months[dm.month - 1]} ${currentYear}`;
@@ -218,6 +221,12 @@ export function Analytics() {
               <p className="text-xs text-[var(--color-muted)]">{T.expense}</p>
               <p className="text-sm font-mono font-bold text-[var(--color-highlight)]">{formatCurrency(totalExpenses)}</p>
             </div>
+            {totalLinkedRefunds > 0 && (
+              <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
+                <p className="text-xs text-[var(--color-muted)]">🔄 상계됨</p>
+                <p className="text-sm font-mono font-bold text-[var(--color-success)]">{formatCurrency(totalLinkedRefunds)}</p>
+              </div>
+            )}
             {totalRefunds > 0 && (
               <div className="bg-[var(--color-accent)] rounded-xl p-2.5">
                 <p className="text-xs text-[var(--color-muted)]">{T.t_refund}</p>
