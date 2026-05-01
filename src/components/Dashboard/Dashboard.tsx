@@ -148,7 +148,7 @@ export function Dashboard() {
       </div>
 
       <div className="rounded-2xl p-4 flex items-center gap-4"
-        style={{ background: 'linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-highlight) 6%, var(--color-surface)) 100%)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        style={{ background: 'linear-gradient(135deg, var(--color-surface) 0%, color-mix(in srgb, var(--color-highlight) 6%, var(--color-surface)) 100%)', border: '1px solid var(--color-card-border)' }}>
         <svg className="w-20 h-20 flex-shrink-0 -rotate-90" viewBox="0 0 80 80">
           <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
           <circle cx="40" cy="40" r="30" fill="none" stroke={savingColor} strokeWidth="8"
@@ -162,7 +162,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-card-border)' }}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-muted)', opacity: 0.7 }}>{T.weekly_expense}</h3>
           <span className="text-xs" style={{ color: 'var(--color-muted)', opacity: 0.5 }}>탭하면 상세 보기</span>
@@ -197,7 +197,7 @@ export function Dashboard() {
       </div>
 
       {categoryData.length > 0 && (
-        <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-card-border)' }}>
           <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-muted)', opacity: 0.7 }}>{T.category_expense}</h3>
           <div className="flex items-center gap-2">
             <ResponsiveContainer width={140} height={140}>
@@ -224,7 +224,7 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl p-4" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-card-border)' }}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-muted)', opacity: 0.7 }}>{T.recent_tx}</h3>
           <button onClick={() => setActiveTab('daily')} className="text-xs text-[var(--color-info)] hover:underline">
